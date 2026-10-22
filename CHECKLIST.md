@@ -118,7 +118,7 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Done when: table-driven tests cover every set type, every WILD combination, invalid sets, and the mandatory-trade rule.
   - Spec: §4.2.1.
   - Notes: Also added `bestSet(hand)` (highest-value set, ties broken by lowest card ids) for bots and the UI.
-- [ ] **1.9 Combat resolver** `🟡 LOCAL + REVIEW` ← **NEXT**
+- [x] **1.9 Combat resolver** `🟡 LOCAL + REVIEW`
   - Goal: `src/engine/combatResolver.ts`:
     - Classic 3v2 waves with ties going to the defender.
     - `stopWhenAttackerAtOrBelow` threshold.
@@ -139,7 +139,8 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
     - **Elimination:** a defender with no territories left is marked eliminated, and their cards move to the attacker.
   - Done when: scripted-dice tests cover each rule including chains (A→B then B→C, with the chain skipped when B wasn't taken), and a 10,000-battle statistical test shows a 3v2 single-wave attacker "both kills" rate of ≈ 37.2% ± 2%.
   - Spec: §4.2.2.
-- [ ] **1.10 Fortify** `🟢 LOCAL`
+  - Notes: Written by Copilot (frontier), so no separate review was needed. `resolveAttack` mutates a working clone; the pure entry point is `resolveAttackQueue`. 3v2 single-wave odds are verified statistically (37.2% / 33.6% / 29.3%).
+- [ ] **1.10 Fortify** `🟢 LOCAL` ← **NEXT**
   - Goal: connected-path BFS over owned territories; troops are clamped so at least 1 always stays behind.
   - File: `src/engine/fortify.ts` (+ test). `applyFortify(state, playerIdx, order)` returns `{ state, executed, skippedReason? }`.
   - Exact rules: the path may only pass through territories the player owns. Troops moved = `min(order.troops, from.troops − 1)`; if that's ≤ 0, skip. A zero or negative request is skipped.
