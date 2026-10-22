@@ -186,10 +186,11 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Goal: full-screen map in owner colors with troop badges; bottom sheet for Draft → Attack (chained orders, stop/occupy chips) → Fortify → Commit; ☰ intel drawer; territory info pill; pan / pinch / zoom.
   - Spec: §9.2–9.3.2.
   - Notes: Owner-colored map with troop badges. The bottom sheet runs Draft (card hand, TRADE best set, mandatory-trade gate) → Attack (tap source, then a pulsing target; chains; STOP and OCCUPY chips; removing an attack also removes its dependent chains) → Fortify (connected destinations, stepper) → Commit (validated with `validateTurnPlan`). Also includes the ☰ drawer (roster, continents, battle log), a tap pill, and pan/pinch/zoom. Fixed two tap bugs found while testing: overlay layers and the info pill are now click-through. Bot turns currently play with a short pause; 1.17 adds the replay.
-- [ ] **1.17 Commit overlay & battle replay** `🔴 FRONTIER` ← **NEXT**
+- [x] **1.17 Commit overlay & battle replay** `🔴 FRONTIER`
   - Goal: sealing → reveal overlay; replay player (camera follows each battle, dice waves, captures, Skip / 1× / 2×); bot turns replay too, with an "auto-skip bots" setting.
   - Spec: §9.3.3.
-- [ ] **1.18 Victory & text inspector** `🟢 LOCAL`
+  - Notes: `buildReplay()` (in `src/ui/components/battleReplay.ts`) is a pure timeline; tests prove every replay ends exactly on the engine's new state. The player tweens the camera to each battle, shows dice with winners and losers, and has 1×/2×/SKIP (speed persists). The sealing overlay shows the real commit id and the revealed secret. Bot turns replay too, with an auto-skip setting in ☰.
+- [ ] **1.18 Victory & text inspector** `🟢 LOCAL` ← **NEXT**
   - Goal: victory screen with stats; inspector drawer showing the raw JSON events and hash-chain reveals (proves the game is "all text").
   - Uses the event log exported by 1.13. Read-only UI, no engine changes.
 - [ ] **1.19 Desktop layout & polish** `🟡 LOCAL + REVIEW`

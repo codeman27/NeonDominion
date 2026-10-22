@@ -6,11 +6,14 @@ import type { TurnOutcome } from '../../transport/transport';
 import type { LocalGame } from '../../transport/localTransport';
 import type { AttackCampaignOrder, CardTradeOrder, FortifyOrder, OccupyMode, TurnActionPlan } from '../../types/actions';
 import type { GameState, TerritoryCard, TerritoryId } from '../../types/game';
-import { renderMap, type MapArrow } from '../components/hexMapRenderer';
+import { buildReplay, type ReplayFrame } from '../components/battleReplay';
+import { renderMap, territoryPoint, type MapArrow } from '../components/hexMapRenderer';
 import { MapCamera } from '../components/mapCamera';
 import { NEON } from '../theme';
 
-type Phase = 'setup' | 'draft' | 'attack' | 'fortify' | 'commit' | 'waiting' | 'over';
+type Phase = 'setup' | 'draft' | 'attack' | 'fortify' | 'commit' | 'waiting' | 'replay' | 'over';
+/** Base duration of one replay beat at 1× speed. */
+const BEAT_MS = 650;
 const PLAN_PHASES = ['draft', 'attack', 'fortify', 'commit'] as const;
 const STOPS = [1, 2, 3, 5];
 const OCCUPY: { mode: OccupyMode; label: string }[] = [
@@ -21,8 +24,6 @@ export interface GameScreenOptions {
   onExit(): void;
   /** Called after every state change worth persisting. */
   onChange?(game: LocalGame): void;
-  /** Plays one bot turn with presentation (replay). Defaults to a short "thinking" pause. */
-  presentBotTurn?(game: LocalGame, outcome: TurnOutcome): Promise<void>;
 }
 
 interface PlannedAttack extends AttackCampaignOrder { chain: boolean }
@@ -51,6 +52,14 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     rotated: false,
     log: [] as string[],
     alive: true,
+    frame: null as ReplayFrame | null,
+    replayWho: 0,
+    replayTurn: 0,
+    speed: Number(localStorage.getItem('nd.speed')) === 2 ? 2 : 1,
+    autoSkipBots: localStorage.getItem('nd.autoSkipBots') === '1',
+    skip: false,
+    sealing: false,
+    wake: null as (() => void) | null,
   };
 
   const camera = new MapCamera(board, svg, onTap, z => svg.classList.toggle('zoomed', z > 1.5));
@@ -101,12 +110,14 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
   /* ------------------------------ rendering ------------------------------ */
   function draw(refit = false): void {
     const portrait = board.clientHeight > board.clientWidth * 1.1;
-    const arrows: MapArrow[] = ui.attacks.map((a, i) => ({ from: a.fromTerritoryId, to: a.toTerritoryId, kind: 'attack', label: String(i + 1) }));
+    const f = ui.frame;
+    let arrows: MapArrow[] = ui.attacks.map((a, i) => ({ from: a.fromTerritoryId, to: a.toTerritoryId, kind: 'attack', label: String(i + 1) }));
     if (ui.fortify) arrows.push({ from: ui.fortify.fromTerritoryId, to: ui.fortify.toTerritoryId, kind: 'fortify', label: 'F' });
-    const boosted = new Set([...(ui.phase === 'setup' ? ui.setup.keys() : ui.draft.keys())]);
+    let boosted = new Set([...(ui.phase === 'setup' ? ui.setup.keys() : ui.draft.keys())]);
+    if (f) { arrows = f.arrow ? [f.arrow] : []; boosted = new Set(f.boosted ?? []); }
     const box = renderMap(svg, map, {
-      colorMode: 'owner', owners: S().territories.map(t => t.owner), troops: projectedTroops(), rotate: portrait,
-      selected: ui.sel, highlight: validTargets(), boosted, arrows,
+      colorMode: 'owner', owners: f ? f.owners : S().territories.map(t => t.owner), troops: f ? f.troops : projectedTroops(), rotate: portrait,
+      selected: f ? null : ui.sel, highlight: f ? null : validTargets(), boosted, arrows,
     });
     camera.setFitBox(box, refit || portrait !== ui.rotated);
     ui.rotated = portrait;
@@ -117,10 +128,14 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
 
   function renderTop(): void {
     const s = S();
-    q('#turn').textContent = s.turnNumber ? String(s.turnNumber).padStart(2, '0') : '—';
+    const replaying = ui.phase === 'replay' && ui.frame;
+    const turn = replaying ? ui.replayTurn : s.turnNumber;
+    const active = replaying ? ui.replayWho : s.phase === 'ACTIVE_TURN_COMMIT' ? s.activePlayerIndex : -1;
+    const owners = ui.frame ? ui.frame.owners : s.territories.map(t => t.owner);
+    q('#turn').textContent = turn ? String(turn).padStart(2, '0') : '—';
     q('#players').innerHTML = s.players.map((p, i) => {
-      const n = s.territories.filter(t => t.owner === i).length;
-      return `<span class="${i === s.activePlayerIndex && s.phase === 'ACTIVE_TURN_COMMIT' ? 'active' : ''} ${p.eliminated ? 'out' : ''}" style="--pc:${color(i)}" title="${p.name}">${n}</span>`;
+      const n = owners.filter(o => o === i).length;
+      return `<span class="${i === active ? 'active' : ''} ${p.eliminated && !n ? 'out' : ''}" style="--pc:${color(i)}" title="${p.name}">${n}</span>`;
     }).join('');
     const phases = q('#phases');
     phases.hidden = !PLAN_PHASES.includes(ui.phase as typeof PLAN_PHASES[number]);
@@ -203,9 +218,28 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
         <div class="note">${errors.length ? `<span style="color:var(--sun)">${errors[0]}</span>` : 'Your whole turn gets signed and locked. Dice stay sealed until the next commander reveals their seed.'}</div>
         <div class="actions">${back('fortify')}<button class="primary btn" id="commit" ${errors.length ? 'disabled' : ''}>COMMIT TURN</button></div>`;
       q('#commit').onclick = commitTurn;
+    } else if (ui.phase === 'replay' && ui.frame) {
+      const f = ui.frame;
+      const dice = f.dice ? (() => {
+        const pairs = Math.min(f.dice.attacker.length, f.dice.defender.length);
+        const die = (v: number, i: number, side: 'a' | 'd') => {
+          const won = i < pairs && (side === 'a' ? v > f.dice!.defender[i] : v >= f.dice!.attacker[i]);
+          return `<span class="die ${side} ${i < pairs ? (won ? 'won' : 'lost') : ''}">${v}</span>`;
+        };
+        return `<div class="rp-dice"><div>${f.dice.attacker.map((v, i) => die(v, i, 'a')).join('')}</div><span class="vs">vs</span><div>${f.dice.defender.map((v, i) => die(v, i, 'd')).join('')}</div></div>`;
+      })() : '';
+      sheet.innerHTML = `
+        <div class="rp-head" style="--pc:${color(ui.replayWho)}"><span class="sw"></span><b>${s.players[ui.replayWho].name}</b><small>TURN ${ui.replayTurn}</small>
+          <div class="rp-ctl">${[1, 2].map(n => `<button data-speed="${n}" class="${ui.speed === n ? 'on' : ''}">${n}×</button>`).join('')}<button id="rp-skip">SKIP ▸▸</button></div></div>
+        <div class="rp-cap ${f.tone ?? ''}">${f.caption}</div>${dice}
+        <div class="rp-sub">${f.sub ?? ''}</div>`;
+      q('#rp-skip').onclick = () => { ui.skip = true; ui.wake?.(); };
+      sheet.querySelectorAll<HTMLElement>('[data-speed]').forEach(b => b.onclick = () => {
+        ui.speed = Number(b.dataset.speed); localStorage.setItem('nd.speed', String(ui.speed)); renderSheet();
+      });
     } else if (ui.phase === 'waiting') {
       const p = s.players[s.activePlayerIndex];
-      sheet.innerHTML = `<div class="hint">${p ? `<b style="color:${color(s.activePlayerIndex)}">${p.name}</b> is moving…` : 'Working…'}</div>`;
+      sheet.innerHTML = `<div class="hint">${ui.sealing ? 'Resolving your turn…' : p ? `<b style="color:${color(s.activePlayerIndex)}">${p.name}</b> is moving…` : 'Working…'}</div>`;
     } else {
       const won = s.winnerIndex === me;
       sheet.innerHTML = `
@@ -332,12 +366,58 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     await afterAction();
   }
 
+  /** Sleep that ends early when the user taps SKIP. */
+  function beat(ms: number): Promise<void> {
+    if (ui.skip || !ui.alive) return Promise.resolve();
+    return new Promise(res => {
+      const t = window.setTimeout(done, ms);
+      function done() { clearTimeout(t); ui.wake = null; res(); }
+      ui.wake = done;
+    });
+  }
+
+  /** Shows the commit → witness reveal handshake (it's real: the reveal is the witness's next hash-chain secret). */
+  async function sealOverlay(outcome: TurnOutcome): Promise<void> {
+    const o = q('#overlay');
+    const w = outcome.reveal.payload.witnessIndex;
+    const steps = [
+      `<div class="ring"></div><h2>SEALING TURN</h2><code>commit ${outcome.commit.id.slice(0, 16)}…</code><p>Your plan is signed. Nobody knows the dice yet.</p>`,
+      `<div class="ring" style="--pc:${color(w)}"></div><h2>AWAITING REVEAL</h2><p><b style="color:${color(w)}">${S().players[w].name}</b> reveals their next hash-chain secret</p>`,
+      `<h2 style="color:var(--lime)">SEED REVEALED ✓</h2><code>secret ${outcome.reveal.payload.revealedSecret.slice(0, 16)}…</code><p>Dice = SHA-256(commit : secret)</p>`,
+    ];
+    o.classList.add('show');
+    o.onclick = () => { ui.skip = true; ui.wake?.(); };
+    for (const html of steps) { o.innerHTML = html; await beat(700); }
+    o.classList.remove('show');
+    o.onclick = null;
+  }
+
+  /** Steps through a turn's replay frames on the board, with the camera following each battle. */
+  async function playReplay(before: GameState, outcome: TurnOutcome): Promise<void> {
+    const frames = buildReplay(map, before, outcome.resolution);
+    ui.phase = 'replay';
+    ui.replayWho = outcome.resolution.playerIndex;
+    ui.replayTurn = outcome.resolution.turnNumber;
+    for (const f of frames) {
+      if (ui.skip || !ui.alive) break;
+      ui.frame = f;
+      draw();
+      if (f.focus?.length) camera.focusOn(f.focus.map(id => territoryPoint(map, id, ui.rotated)));
+      await beat((BEAT_MS * f.weight) / ui.speed);
+    }
+    ui.frame = null;
+    ui.skip = false;
+    camera.fitAnimated();
+  }
+
   async function commitTurn(): Promise<void> {
     const plan = buildPlan();
+    const before = S();
     ui.phase = 'waiting';
     draw();
+    let outcome: TurnOutcome;
     try {
-      await game.submitTurnCommit(plan);
+      outcome = await game.submitTurnCommit(plan);
     } catch (err) {
       ui.phase = 'commit';
       draw();
@@ -346,6 +426,12 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     }
     resetPlan();
     opts.onChange?.(game);
+    ui.sealing = true;
+    draw();
+    await sealOverlay(outcome);
+    ui.sealing = false;
+    ui.skip = false;
+    await playReplay(before, outcome);
     await afterAction();
   }
 
@@ -354,15 +440,15 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     ui.phase = 'waiting';
     draw();
     while (ui.alive && game.isBotTurn()) {
+      const before = S();
       const outcome = await game.playBotTurn();
       if (!outcome) break;
       opts.onChange?.(game);
-      if (!fast) {
-        if (opts.presentBotTurn) await opts.presentBotTurn(game, outcome);
-        else await new Promise(r => setTimeout(r, 450));
-      }
-      draw();
+      if (fast || ui.autoSkipBots) { draw(); await new Promise(r => setTimeout(r, fast ? 0 : 120)); }
+      else await playReplay(before, outcome);
+      ui.phase = 'waiting';
     }
+    draw();
   }
 
   async function afterAction(): Promise<void> {
@@ -384,6 +470,9 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
   q('#drawer').onclick = e => { if ((e.target as HTMLElement).id === 'drawer') q('#drawer').classList.remove('open'); };
   q('#exit').onclick = () => { if (confirm('Leave this game? (It is saved — you can continue from the menu.)')) exit(); };
   q('#fit').onclick = () => camera.fit();
+  const autoSkip = q<HTMLInputElement>('#auto-skip');
+  autoSkip.checked = ui.autoSkipBots;
+  autoSkip.onchange = () => { ui.autoSkipBots = autoSkip.checked; localStorage.setItem('nd.autoSkipBots', autoSkip.checked ? '1' : '0'); };
   q('#phases').querySelectorAll<HTMLElement>('button').forEach(b => b.onclick = () => {
     const target = b.dataset.p as Phase;
     if (target !== 'draft' && (draftLeft() !== 0 || tradeRequired())) return toast('Place all your troops first');
@@ -422,6 +511,7 @@ const GAME_HTML = `
     <h3>COMMANDERS</h3><ul id="roster"></ul>
     <h3>CONTINENTS</h3><ul id="continents"></ul>
     <h3>BATTLE LOG</h3><ul class="log" id="log"></ul>
+    <h3>SETTINGS</h3><label class="setting"><input type="checkbox" id="auto-skip"> Auto-skip bot replays</label>
     <button class="btn exit" id="exit">◂ MENU</button>
   </div></div>
   <div class="overlay" id="overlay"></div>

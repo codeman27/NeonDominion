@@ -10,6 +10,7 @@ export class MapCamera {
   private pointers = new Map<number, { x: number; y: number }>();
   private start = { x: 0, y: 0 };
   private moved = false;
+  private anim = 0;
 
   constructor(
     private readonly board: HTMLElement,
@@ -44,6 +45,37 @@ export class MapCamera {
   fit(): void {
     this.view = { ...this.fitBox };
     this.apply();
+  }
+
+  /** Smoothly frames the given board points (e.g. two territories in a battle). */
+  focusOn(points: { x: number; y: number }[], pad = 50): void {
+    if (!points.length) return;
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const p of points) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+    const minW = this.fitBox.w * 0.4; const minH = this.fitBox.h * 0.4;
+    const w = Math.max(minW, x1 - x0 + 2 * pad); const h = Math.max(minH, y1 - y0 + 2 * pad);
+    this.animateTo({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h });
+  }
+
+  /** Tween the view to `target` (instant when the user prefers reduced motion). */
+  animateTo(target: ViewBox, ms = 320): void {
+    cancelAnimationFrame(this.anim);
+    const from = { ...this.view };
+    if (ms <= 0 || matchMedia('(prefers-reduced-motion: reduce)').matches) { this.view = { ...target }; this.apply(); return; }
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / ms);
+      const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      this.view = { x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e, w: from.w + (target.w - from.w) * e, h: from.h + (target.h - from.h) * e };
+      this.apply();
+      if (k < 1) this.anim = requestAnimationFrame(step);
+    };
+    this.anim = requestAnimationFrame(step);
+  }
+
+  /** Animated return to the whole map. */
+  fitAnimated(): void {
+    this.animateTo({ ...this.fitBox });
   }
 
   /** 1 = whole map visible; >1 = zoomed in. */

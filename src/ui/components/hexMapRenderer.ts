@@ -61,6 +61,12 @@ function medoidPx(points: Pt[]): Pt {
   return best;
 }
 
+/** Board coordinates of a territory's badge, matching `renderMap` (including portrait rotation). */
+export function territoryPoint(map: GameMap, id: number, rotate: boolean): Pt {
+  const p = hexToPixel(map.territories[id].labelHex, SIZE);
+  return rotate ? { x: -p.y, y: p.x } : p;
+}
+
 /** Renders the map into `svg` and returns the fitted view box (for the camera). */
 export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptions): ViewBox {
   while (svg.firstChild) svg.removeChild(svg.firstChild);

@@ -107,3 +107,27 @@
 .overlay h2 { margin: 0; font: 900 18px var(--display); letter-spacing: .2em; }
 .overlay p { margin: 0; font-size: 12px; color: var(--dim); line-height: 1.6; }
 .overlay code { font-size: 11px; color: var(--cyan); word-break: break-all; }
+
+/* Replay panel */
+.rp-head { display: flex; align-items: center; gap: 8px; }
+.rp-head .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 8px var(--pc); }
+.rp-head b { font: 700 12px var(--display); letter-spacing: .1em; color: var(--pc); }
+.rp-head small { color: var(--dim); font-size: 10px; letter-spacing: .15em; }
+.rp-ctl { margin-left: auto; display: flex; gap: 4px; }
+.rp-ctl button { border: 1px solid var(--line); background: none; border-radius: 8px; padding: 6px 8px; font: 700 10px var(--display); color: var(--dim); }
+.rp-ctl button.on { background: var(--cyan); color: #120428; }
+.rp-ctl #rp-skip { color: var(--mag); border-color: var(--mag); }
+.rp-cap { text-align: center; font: 900 15px var(--display); letter-spacing: .08em; }
+.rp-cap.good { color: var(--lime); text-shadow: 0 0 10px var(--lime); }
+.rp-cap.bad { color: var(--mag); }
+.rp-sub { text-align: center; font-size: 12px; color: var(--dim); min-height: 1.2em; }
+.rp-dice { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.rp-dice > div { display: flex; gap: 5px; }
+.rp-dice .vs { font-size: 10px; color: var(--dim); }
+.die { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; font: 900 15px var(--display); color: #120428; transition: opacity .2s, transform .2s; }
+.die.a { background: var(--mag); box-shadow: 0 0 10px rgba(255, 43, 214, .6); }
+.die.d { background: var(--cyan); box-shadow: 0 0 10px rgba(25, 246, 255, .6); }
+.die.lost { opacity: .3; transform: scale(.85); box-shadow: none; }
+.die.won { transform: scale(1.08); }
+.setting { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 6px 2px; }
+.setting input { width: 18px; height: 18px; accent-color: var(--mag); }
