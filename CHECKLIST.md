@@ -61,7 +61,7 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
     - Hashing is over the raw 32 bytes and values are canonical lowercase hex.
     - The owner side uses `HashChainCursor`, which saves and restores `{ root, length, used }`.
     - Verification is strictly next-in-order; skipping ahead or replaying a secret is rejected.
-- [ ] **1.5 Canonical state hash** `🟢 LOCAL` ← **NEXT**
+- [x] **1.5 Canonical state hash** `🟢 LOCAL`
   - Goal: `src/crypto/stateHash.ts`.
   - `canonicalStringify(value)` rules:
     - Objects are written with keys sorted by plain string comparison.
@@ -78,7 +78,8 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Spec: §7.2.
 
 ### Rules engine (pure functions, no DOM)
-- [ ] **1.6 Game & action types** `🟢 LOCAL`
+  - Notes: Started by the local model and finished by Copilot: `computeStateHash` now accepts any object, and tests were added (the pinned vector was computed independently with Node crypto).
+- [ ] **1.6 Game & action types** `🟢 LOCAL` ← **NEXT**
   - Goal: `src/types/game.ts` (add `GameState`, `PlayerState`, `TerritoryState`, `TerritoryCard`, `GamePhase`) and `src/types/actions.ts` (plans, orders, resolution logs).
   - Files: `src/types/game.ts` (append; keep the existing map types unchanged) and `src/types/actions.ts`.
   - `GameState.territories` must be an **array** indexed by territory id (`TerritoryState[]`), not a `Record`, so key order can never matter. Players are referenced by **index** (`number`) inside `GameState`; `PlayerState.id` stays a string (it will hold a pubkey later).
