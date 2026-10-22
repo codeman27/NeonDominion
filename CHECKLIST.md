@@ -101,7 +101,7 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Done when: deals are even and deterministic, emblem counts differ by at most 1, the deck has `T+2` cards, and every invalid placement case is rejected.
   - Spec: §4.1.
   - Notes: `createGame` seeds its RNG with `SHA256('SETUP:gameId:setupSeed')`. `GameRuleError` is in `src/engine/errors.ts`, and shared fixtures are in `src/engine/testing.ts`.
-- [ ] **1.8 Reinforcements & cards** `🟢 LOCAL` ← **NEXT**
+- [x] **1.8 Reinforcements & cards** `🟢 LOCAL`
   - Goal: `src/engine/rules.ts`:
     - Base reinforcements `max(3, ⌊owned/3⌋)`.
     - Continent bonuses.
@@ -117,7 +117,8 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
     - Territory-match bonus: +2 troops on each traded card's territory that the player owns. At most one +2 per traded set (use the first matching card in the order given).
   - Done when: table-driven tests cover every set type, every WILD combination, invalid sets, and the mandatory-trade rule.
   - Spec: §4.2.1.
-- [ ] **1.9 Combat resolver** `🟡 LOCAL + REVIEW`
+  - Notes: Also added `bestSet(hand)` (highest-value set, ties broken by lowest card ids) for bots and the UI.
+- [ ] **1.9 Combat resolver** `🟡 LOCAL + REVIEW` ← **NEXT**
   - Goal: `src/engine/combatResolver.ts`:
     - Classic 3v2 waves with ties going to the defender.
     - `stopWhenAttackerAtOrBelow` threshold.
