@@ -50,3 +50,65 @@ export interface GameMap {
   continents: Continent[];
   chokepoints: Chokepoint[];
 }
+
+/* ---------------------------------------- Game state ---------------------------------------- */
+
+/** Players are referenced by seat index inside game state; `PlayerState.id` carries the stable identity (later a pubkey). */
+export type PlayerIndex = number;
+
+export type CardEmblem = 'INFANTRY' | 'CAVALRY' | 'ARTILLERY' | 'WILD';
+
+export interface TerritoryCard {
+  id: number;
+  /** null for WILD cards. */
+  territoryId: TerritoryId | null;
+  emblem: CardEmblem;
+}
+
+export interface PlayerState {
+  id: string;
+  name: string;
+  isBot: boolean;
+  eliminated: boolean;
+  cards: TerritoryCard[];
+  /** Troops still to place during SETUP_PLACEMENT (0 once submitted). */
+  setupTroops: number;
+  setupDone: boolean;
+  /** Current head of this player's SHA-256 hash chain (C_k). */
+  currentHashCommitment: string;
+  /** Number of secrets this player has revealed so far. */
+  hashChainIndex: number;
+}
+
+export type GamePhase = 'SETUP_PLACEMENT' | 'ACTIVE_TURN_COMMIT' | 'GAME_OVER';
+
+export interface TerritoryState {
+  owner: PlayerIndex;
+  troops: number;
+}
+
+/**
+ * Complete, canonical-JSON-safe game state (integers, strings, booleans, null, arrays, plain objects).
+ * The map itself is not stored: every client regenerates it from (mapSeed, players.length, mapGeneratorVersion).
+ */
+export interface GameState {
+  version: 1;
+  gameId: string;
+  mapSeed: string;
+  mapGeneratorVersion: number;
+  phase: GamePhase;
+  /** 0 during setup; the first regular turn is 1. */
+  turnNumber: number;
+  activePlayerIndex: PlayerIndex;
+  players: PlayerState[];
+  /** Indexed by TerritoryId. */
+  territories: TerritoryState[];
+  /** Top of the deck is the LAST element (draw with pop). */
+  deck: TerritoryCard[];
+  discardPile: TerritoryCard[];
+  winnerIndex: PlayerIndex | null;
+  /** Hash of the state before the last applied action ('' for the initial state). */
+  prevStateHash: string;
+  lastCommitEventId: string | null;
+  lastRevealEventId: string | null;
+}

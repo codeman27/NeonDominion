@@ -79,12 +79,13 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
 
 ### Rules engine (pure functions, no DOM)
   - Notes: Started by the local model and finished by Copilot: `computeStateHash` now accepts any object, and tests were added (the pinned vector was computed independently with Node crypto).
-- [ ] **1.6 Game & action types** `🟢 LOCAL` ← **NEXT**
+- [x] **1.6 Game & action types** `🟢 LOCAL`
   - Goal: `src/types/game.ts` (add `GameState`, `PlayerState`, `TerritoryState`, `TerritoryCard`, `GamePhase`) and `src/types/actions.ts` (plans, orders, resolution logs).
   - Files: `src/types/game.ts` (append; keep the existing map types unchanged) and `src/types/actions.ts`.
   - `GameState.territories` must be an **array** indexed by territory id (`TerritoryState[]`), not a `Record`, so key order can never matter. Players are referenced by **index** (`number`) inside `GameState`; `PlayerState.id` stays a string (it will hold a pubkey later).
   - Done when: everything type-checks and matches §6.1–6.2 apart from the two changes above. Record them in ARCHITECTURE §6.
-- [ ] **1.7 Game setup & deal** `🟢 LOCAL`
+  - Notes: Deviations from §6 are recorded at the top of ARCHITECTURE §6: territories array, seat-index players, map not stored in state, setupTroops in PlayerState, simplified GamePhase.
+- [ ] **1.7 Game setup & deal** `🟢 LOCAL` ← **NEXT**
   - Goal: `createGame({ map, players, setupSeed })`:
     - Deal territories round-robin from a seeded shuffle, 1 troop each.
     - Build and shuffle the card deck (1 card per territory with balanced emblems, plus 2 WILD).

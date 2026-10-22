@@ -332,6 +332,15 @@ Because every Nostr event is signed by the author's private key (`sig` over `id`
 
 ## 6. Core TypeScript Data Models
 
+> **As implemented (step 1.6).** The authoritative types are in [`src/types/game.ts`](./src/types/game.ts) and [`src/types/actions.ts`](./src/types/actions.ts). They differ from the listings below in these ways:
+> - **`GameState.territories` is an array** indexed by territory id (`TerritoryState { owner, troops }`), not a `Record`.
+> - **Players are referenced by seat index** (`PlayerIndex = number`) everywhere inside state and actions (`owner`, `activePlayerIndex`, `winnerIndex`, `plan.playerIndex`). `PlayerState.id` carries the stable identity (later a pubkey).
+> - **The map isn't stored in state.** Clients regenerate it from `(mapSeed, players.length, mapGeneratorVersion)`.
+> - `PlayerState` gains **`setupTroops` / `setupDone`** and drops `color`, which is a UI concern derived from the seat index.
+> - **`GamePhase` is now `SETUP_PLACEMENT | ACTIVE_TURN_COMMIT | GAME_OVER`.** Lobby and reveal-waiting are transport states, not engine states.
+> - **The deck's top card is the last element.**
+> - **Resolution logs use typed skip reasons**, and `FortifyResolution` and `ReinforcementBreakdown` are named types.
+
 Opus 5.5 should implement these exact data contracts in `src/types/`.
 
 ### 6.1 `src/types/game.ts`
