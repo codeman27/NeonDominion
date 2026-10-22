@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#07010f">
+<title>Style A — Neon Grid (Mobile)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/mock.css">
+<style>
+:root {
+  --bg: #07010f; --mag: #ff2bd6; --cyan: #19f6ff; --sun: #ffb800; --lime: #39ff14;
+  --txt: #ece6ff; --dim: #9b8cc4; --glass: rgba(22, 6, 48, .72); --line: rgba(25, 246, 255, .3);
+  --display: 'Orbitron', 'Segoe UI', sans-serif; --mono: 'Share Tech Mono', ui-monospace, monospace;
+  --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
+}
+body { background: #000; color: var(--txt); font-family: var(--mono); -webkit-tap-highlight-color: transparent; user-select: none; }
+/* Desktop preview: show a phone frame. Real phones: full-bleed. */
+.phone { position: relative; width: 390px; height: 844px; margin: calc(50vh - 422px) auto 0; border-radius: 46px; overflow: hidden; background: var(--bg);
+  box-shadow: 0 0 0 10px #1b1b22, 0 0 0 11px #333, 0 30px 80px rgba(255, 43, 214, .25); }
+@media (max-height: 880px) { .phone { transform: scale(calc(100vh / 900)); transform-origin: top center; margin-top: 12px; } }
+@media (max-width: 500px) { .phone { width: 100vw; height: 100dvh; margin: 0; border-radius: 0; box-shadow: none; transform: none; } .mock-switch { display: none; } }
+.phone .screen { position: absolute; }
+.glass { background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--line); }
+button { color: inherit; }
+
+/* ---------- MENU ---------- */
+#screen-menu { overflow: hidden; background: linear-gradient(180deg, #05010c 0%, #1a0538 24%, #4a0b5e 33%, #07010f 33.2%); }
+.stars { position: absolute; inset: 0 0 67% 0; background-image: radial-gradient(1px 1px at 12% 22%, #fff8, transparent), radial-gradient(1px 1px at 32% 48%, #fff6, transparent),
+  radial-gradient(1.5px 1.5px at 72% 18%, #fffa, transparent), radial-gradient(1px 1px at 88% 54%, #fff6, transparent), radial-gradient(1px 1px at 55% 10%, #fff5, transparent); }
+.sun { position: absolute; left: 50%; top: 33%; width: 190px; height: 190px; transform: translate(-50%, -78%); border-radius: 50%;
+  background: linear-gradient(180deg, #ffe45c 0%, #ff9d2b 35%, #ff2bd6 75%, #8a2be2 100%);
+  -webkit-mask: linear-gradient(180deg, #000 0 52%, transparent 52% 56%, #000 56% 64%, transparent 64% 69%, #000 69% 76%, transparent 76% 82%, #000 82%);
+          mask: linear-gradient(180deg, #000 0 52%, transparent 52% 56%, #000 56% 64%, transparent 64% 69%, #000 69% 76%, transparent 76% 82%, #000 82%);
+  filter: drop-shadow(0 0 30px #ff2bd6aa); }
+.floor-wrap { position: absolute; left: 0; right: 0; top: 33%; bottom: 0; perspective: 220px; overflow: hidden; }
+.floor { position: absolute; left: -60%; right: -60%; top: 0; height: 200%; transform-origin: top; transform: rotateX(72deg);
+  background-image: linear-gradient(var(--mag) 2px, transparent 2px), linear-gradient(90deg, var(--mag) 2px, transparent 2px);
+  background-size: 44px 44px; animation: floor 1.6s linear infinite; opacity: .6;
+  -webkit-mask: linear-gradient(180deg, #000 5%, transparent 55%); mask: linear-gradient(180deg, #000 5%, transparent 55%); }
+@keyframes floor { to { background-position: 0 44px; } }
+.horizon { position: absolute; left: 0; right: 0; top: 33%; height: 2px; background: var(--cyan); box-shadow: 0 0 16px 3px var(--cyan); }
+.m-menu { position: relative; height: 100%; display: flex; flex-direction: column; padding: calc(28px + var(--safe-t)) 18px calc(18px + var(--safe-b)); gap: 14px; }
+.m-title { text-align: center; }
+.kicker { font: 500 9px var(--display); letter-spacing: .5em; color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+.title { margin: 6px 0 0; font: 900 italic 46px/.95 var(--display); letter-spacing: .03em;
+  background: linear-gradient(180deg, #fff 0%, #b9f6ff 40%, #19f6ff 50%, #ff2bd6 51%, #ffb3f1 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 43, 214, .8)) drop-shadow(0 3px 0 #3b0a5c); }
+.m-card { margin-top: auto; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 12px; background: rgba(0,0,0,.35); }
+.seg button { border: 0; background: none; padding: 10px; border-radius: 9px; font: 700 12px var(--display); letter-spacing: .15em; color: var(--dim); }
+.seg button.active { background: var(--cyan); color: #120428; box-shadow: 0 0 14px rgba(25,246,255,.5); }
+.seg button.locked { opacity: .5; }
+.m-row { display: flex; align-items: center; justify-content: space-between; }
+.lbl { font: 700 10px var(--display); letter-spacing: .25em; color: var(--dim); }
+.stepper { display: flex; align-items: center; gap: 4px; }
+.stepper button { width: 44px; height: 44px; border-radius: 12px; border: 1px solid rgba(255,43,214,.5); background: rgba(255,43,214,.08); font: 700 22px var(--display); color: var(--mag); }
+.stepper b { width: 44px; text-align: center; font: 900 28px var(--display); color: var(--txt); text-shadow: 0 0 10px var(--mag); }
+.dots { display: flex; gap: 8px; justify-content: center; }
+.dots span { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--pc); box-shadow: 0 0 8px var(--pc); display: grid; place-items: center; font: 700 8px var(--display); color: var(--pc); }
+.dots span.you { background: var(--pc); color: #120428; }
+.m-prev { position: relative; height: 170px; border-radius: 12px; border: 1px solid rgba(255,43,214,.35); background: radial-gradient(ellipse, rgba(138,43,226,.2), transparent 70%); }
+.m-prev svg { position: absolute; inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); }
+.reroll { position: absolute; right: 8px; bottom: 8px; border: 1px solid var(--cyan); border-radius: 99px; background: rgba(7,1,15,.8); padding: 7px 12px; font: 700 10px var(--display); letter-spacing: .15em; color: var(--cyan); }
+.m-stats { text-align: center; font-size: 11px; color: var(--dim); letter-spacing: .08em; margin-top: -4px; }
+.m-stats b { color: var(--cyan); }
+.adv summary { font: 700 10px var(--display); letter-spacing: .25em; color: var(--dim); list-style: none; cursor: pointer; }
+.adv summary::after { content: ' ▸'; } .adv[open] summary::after { content: ' ▾'; }
+.adv input { width: 100%; margin-top: 8px; background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 10px; color: var(--cyan); font: 16px var(--mono); padding: 10px 12px; letter-spacing: .15em; outline: none; }
+.adv small { display: block; margin-top: 6px; font-size: 10px; color: var(--dim); }
+.start { height: 60px; border-radius: 16px; border: 0; font: 900 18px var(--display); letter-spacing: .3em; color: #120428; background: linear-gradient(90deg, var(--cyan), var(--mag)); box-shadow: 0 0 26px rgba(255,43,214,.6); }
+
+/* ---------- GAME ---------- */
+#screen-map { background: radial-gradient(ellipse at 50% 40%, rgba(138,43,226,.25), transparent 70%),
+  linear-gradient(rgba(255,43,214,.05) 1px, transparent 1px) 0 0/32px 32px, linear-gradient(90deg, rgba(255,43,214,.05) 1px, transparent 1px) 0 0/32px 32px, var(--bg); }
+#screen-map.active { display: flex; flex-direction: column; }
+.m-top { display: flex; align-items: center; gap: 10px; padding: calc(10px + var(--safe-t)) 12px 8px; }
+.icon { width: 40px; height: 40px; flex: none; border-radius: 12px; border: 1px solid var(--line); background: var(--glass); font-size: 18px; color: var(--cyan); }
+.m-turn { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.m-turn small { font: 700 7px var(--display); letter-spacing: .3em; color: var(--dim); } .m-turn b { font: 900 20px var(--display); color: var(--sun); text-shadow: 0 0 10px var(--sun); }
+.m-players { flex: 1; display: flex; justify-content: center; gap: 6px; }
+.m-players span { position: relative; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--pc); display: grid; place-items: center; font: 700 10px var(--display); color: var(--pc); background: rgba(7,1,15,.7); }
+.m-players span.active { background: var(--pc); color: #120428; box-shadow: 0 0 12px var(--pc); }
+.m-board { position: relative; flex: 1; min-height: 0; touch-action: none; }
+.m-board svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.m-board svg .layer-labels { opacity: 0; transition: opacity .2s; } .m-board svg.zoomed .layer-labels { opacity: 1; }
+.terr { cursor: pointer; } .terr .hex { transition: fill-opacity .15s, opacity .15s; }
+.terr.dim { opacity: .35; } .terr.target .hex { fill-opacity: .4; animation: pulse 1s ease-in-out infinite; }
+.terr.selected .hex { fill-opacity: .45; }
+@keyframes pulse { 50% { fill-opacity: .15; } }
+.flow { animation: flow 1s linear infinite; } @keyframes flow { to { stroke-dashoffset: -16; } }
+.pop { position: absolute; left: 12px; right: 12px; top: 6px; padding: 9px 12px; border-radius: 12px; display: none; align-items: center; gap: 10px; font-size: 12px; }
+.pop.show { display: flex; }
+.pop .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 8px var(--pc); }
+.pop b { font: 700 12px var(--display); letter-spacing: .08em; } .pop small { color: var(--dim); } .pop .tr { margin-left: auto; font: 900 18px var(--display); color: var(--pc); }
+.toast { position: absolute; left: 50%; bottom: 10px; transform: translate(-50%, 20px); opacity: 0; padding: 8px 14px; border-radius: 99px; font-size: 11px; white-space: nowrap; background: rgba(7,1,15,.9); border: 1px solid var(--mag); transition: .25s; pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.m-phases { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 6px 10px 0; }
+.m-phases button { position: relative; border: 1px solid rgba(155,140,196,.25); background: rgba(7,1,15,.6); border-radius: 10px; padding: 9px 0; font: 700 9px var(--display); letter-spacing: .14em; color: var(--dim); }
+.m-phases button.done { color: var(--cyan); border-color: rgba(25,246,255,.4); }
+.m-phases button.active { background: var(--mag); border-color: var(--mag); color: #120428; box-shadow: 0 0 14px var(--mag); }
+.m-phases i { position: absolute; top: -7px; right: -3px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; font: 700 9px/18px var(--display); font-style: normal; background: var(--sun); color: #120428; }
+.m-phases i:empty { display: none; }
+.sheet { margin: 8px 10px calc(10px + var(--safe-b)); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 178px; }
+.hint { font-size: 11px; color: var(--dim); text-align: center; } .hint b { color: var(--cyan); font-weight: 400; }
+.big { display: flex; align-items: center; gap: 12px; }
+.big .n { font: 900 40px/1 var(--display); color: var(--sun); text-shadow: 0 0 14px var(--sun); min-width: 54px; text-align: center; }
+.big .t { font: 700 10px var(--display); letter-spacing: .2em; line-height: 1.6; } .big .t small { display: block; font: 11px var(--mono); letter-spacing: 0; color: var(--dim); }
+.chip-btn { margin-left: auto; border: 1px solid var(--sun); border-radius: 12px; background: rgba(255,184,0,.08); padding: 8px 10px; font: 700 10px var(--display); letter-spacing: .1em; color: var(--sun); text-align: center; }
+.chip-btn small { display: block; font: 9px var(--mono); letter-spacing: .05em; color: var(--dim); }
+.chip-btn:disabled { opacity: .35; }
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; min-height: 30px; }
+.chips span { flex: none; padding: 6px 10px; border-radius: 99px; font-size: 11px; background: rgba(25,246,255,.08); border: 1px solid var(--line); }
+.chips span b { color: var(--lime); margin-left: 4px; }
+.chips .empty { border-style: dashed; color: var(--dim); background: none; }
+.atk-list { display: flex; flex-direction: column; gap: 6px; max-height: 112px; overflow-y: auto; }
+.atk-item { display: grid; grid-template-columns: 22px 1fr auto auto 26px; gap: 6px; align-items: center; padding: 6px 6px 6px 8px; border-radius: 12px; border: 1px solid rgba(255,43,214,.35); background: rgba(255,43,214,.06); font-size: 11px; }
+.atk-item.chain { margin-left: 14px; border-style: dashed; }
+.atk-item .no { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--mag); color: #120428; font: 900 10px var(--display); }
+.atk-item .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .atk-item .p em { color: var(--mag); font-style: normal; margin: 0 4px; }
+.atk-item .o { border: 1px solid rgba(155,140,196,.4); border-radius: 99px; background: none; padding: 4px 7px; font: 10px var(--mono); color: var(--txt); }
+.atk-item .x { border: 0; background: none; font-size: 16px; color: var(--dim); }
+.fort { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 12px; border: 1px dashed var(--cyan); font-size: 12px; }
+.fort em { color: var(--cyan); font-style: normal; }
+.fort .stepper { margin-left: auto; } .fort .stepper button { width: 32px; height: 32px; border-radius: 9px; font-size: 16px; border-color: var(--cyan); color: var(--cyan); background: rgba(25,246,255,.08); }
+.fort .stepper b { width: 30px; font-size: 16px; text-shadow: none; }
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.summary div { text-align: center; padding: 8px 0; border-radius: 12px; background: rgba(25,246,255,.06); }
+.summary b { display: block; font: 900 22px var(--display); color: var(--cyan); } .summary small { font-size: 9px; letter-spacing: .15em; color: var(--dim); }
+.actions { display: flex; gap: 8px; margin-top: auto; }
+.btn { flex: 1; height: 50px; border-radius: 14px; border: 1px solid var(--line); background: rgba(7,1,15,.6); font: 700 12px var(--display); letter-spacing: .18em; color: var(--txt); }
+.btn.primary { flex: 2; border: 0; color: #120428; background: linear-gradient(90deg, var(--cyan), var(--mag)); box-shadow: 0 0 18px rgba(255,43,214,.45); }
+.btn.ghost { flex: 0 0 64px; color: var(--dim); }
+.btn:disabled { opacity: .4; box-shadow: none; }
+.note { font-size: 10px; color: var(--dim); text-align: center; line-height: 1.5; }
+
+/* Drawer */
+.drawer { position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.drawer.open { opacity: 1; pointer-events: auto; }
+.drawer-panel { position: absolute; top: 0; bottom: 0; left: 0; width: 84%; padding: calc(18px + var(--safe-t)) 16px 18px; border-radius: 0 20px 20px 0; overflow-y: auto; transform: translateX(-100%); transition: transform .25s; }
+.drawer.open .drawer-panel { transform: none; }
+.drawer h3 { font: 700 10px var(--display); letter-spacing: .25em; color: var(--cyan); text-shadow: 0 0 8px var(--cyan); margin: 18px 0 8px; } .drawer h3:first-child { margin-top: 0; }
+.roster-row { display: grid; grid-template-columns: 10px 1fr; gap: 2px 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 4px; border: 1px solid transparent; }
+.roster-row.is-active { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 10%, transparent); }
+.roster-row .sw { grid-row: 1 / 3; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 8px var(--pc); }
+.roster-row .nm { color: var(--pc); font: 700 11px var(--display); letter-spacing: .1em; }
+.st { display: flex; gap: 12px; font-size: 12px; } .st i { font-style: normal; } .st em { font-style: normal; color: var(--dim); font-size: 9px; margin-left: 3px; }
+.cont-row { display: grid; grid-template-columns: 8px 1fr auto; gap: 4px 8px; align-items: center; padding: 5px 2px; font-size: 12px; }
+.cont-row .sw { width: 8px; height: 8px; transform: rotate(45deg); background: var(--cc); box-shadow: 0 0 6px var(--cc); }
+.cont-row .bn { color: var(--sun); font: 700 11px var(--display); }
+.cont-row .bar { grid-column: 2 / 4; height: 3px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; } .cont-row .bar span { display: block; height: 100%; background: var(--pc); }
+.cont-row .own { grid-column: 2 / 4; font-size: 10px; color: var(--dim); }
+#battle-log li { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 11px; padding: 6px 0; border-bottom: 1px solid rgba(155,140,196,.12); }
+#battle-log .turn { display: none; } #battle-log .who { color: var(--pc); } #battle-log .where { grid-column: 1 / -1; color: var(--dim); }
+#battle-log .dice { display: inline-flex; gap: 2px; } #battle-log .die { width: 15px; height: 15px; border-radius: 3px; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #120428; }
+#battle-log .dice.atk .die { background: var(--mag); } #battle-log .dice.def .die { background: var(--cyan); }
+#battle-log .vs { display: none; } #battle-log .res { color: var(--dim); } #battle-log .res.cap { color: var(--lime); }
+#battle-log li > .dice.atk { grid-column: 1; } #battle-log li > .dice.def { grid-column: 2; }
+
+/* Commit overlay */
+.seal { position: absolute; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(7,1,15,.92); text-align: center; padding: 30px; }
+.seal.show { display: flex; }
+.seal .ring { width: 110px; height: 110px; border-radius: 50%; border: 3px solid var(--mag); border-top-color: transparent; animation: spin 1s linear infinite; box-shadow: 0 0 20px var(--mag); }
+.seal.done .ring { animation: none; border-color: var(--lime); box-shadow: 0 0 20px var(--lime); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.seal h2 { margin: 0; font: 900 18px var(--display); letter-spacing: .2em; } .seal code { font-size: 11px; color: var(--cyan); word-break: break-all; }
+.seal p { margin: 0; font-size: 12px; color: var(--dim); line-height: 1.6; }
+</style>
+</head>
+<body>
+<nav class="mock-switch"><a href="index.html">◂ All styles</a><a href="style-a-neon-grid.html?desktop">Desktop</a><span class="label">A · Mobile</span><button data-screen="menu">Menu</button><button data-screen="map">Map</button></nav>
+
+<div class="phone">
+  <section class="screen" id="screen-menu">
+    <div class="stars"></div><div class="sun"></div><div class="floor-wrap"><div class="floor"></div></div><div class="horizon"></div>
+    <div class="m-menu">
+      <header class="m-title"><div class="kicker">◢ HEX WARFARE ◣</div><h1 class="title">NEON<br>DOMINION</h1></header>
+      <div class="m-card glass">
+        <div class="seg"><button class="active">SOLO</button><button class="locked">NOSTR 🔒</button></div>
+        <div class="m-row"><span class="lbl">COMMANDERS</span>
+          <div class="stepper"><button id="pc-minus">−</button><b id="pc-val">4</b><button id="pc-plus">+</button></div></div>
+        <div class="dots" id="pc-dots"></div>
+        <div class="m-prev"><svg id="preview"></svg><button id="reroll" class="reroll">⟳ NEW MAP</button></div>
+        <div class="m-stats" id="m-stats"></div>
+        <details class="adv"><summary>ADVANCED</summary><input id="seed" spellcheck="false" autocapitalize="characters"><small>Same seed + same commander count = same map. Share it to replay.</small></details>
+      </div>
+      <button id="start" class="start">START ▸</button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-map">
+    <header class="m-top">
+      <button class="icon" id="open-drawer" aria-label="Intel">☰</button>
+      <div class="m-turn"><small>TURN</small><b>07</b></div>
+      <div class="m-players" id="m-players"></div>
+      <button class="icon" id="fit" aria-label="Fit map">⤢</button>
+    </header>
+    <main class="m-board" id="board"><svg id="map"></svg><div class="pop glass" id="pop"></div><div class="toast" id="toast"></div></main>
+    <nav class="m-phases" id="phases">
+      <button data-p="draft">DRAFT<i id="badge-draft"></i></button>
+      <button data-p="attack">ATTACK<i id="badge-attack"></i></button>
+      <button data-p="fortify">FORTIFY</button>
+      <button data-p="commit">COMMIT</button>
+    </nav>
+    <div class="sheet glass" id="sheet"></div>
+    <div class="drawer" id="drawer"><div class="drawer-panel glass">
+      <h3>COMMANDERS</h3><ul id="roster"></ul>
+      <h3>CONTINENTS</h3><ul id="continents"></ul>
+      <h3>LAST TURN</h3><ul id="battle-log"></ul>
+    </div></div>
+    <div class="seal" id="seal"><div class="ring"></div><h2 id="seal-title">SEALING TURN</h2><code id="seal-hash"></code><p id="seal-msg"></p><button class="btn primary" id="seal-ok" style="flex:none;width:220px;display:none">BACK TO MAP</button></div>
+  </section>
+</div>
+
+<script src="shared/mockmap.js"></script>
+<script src="shared/mockui.js"></script>
+<script src="shared/theme-neon.js"></script>
+<script>
+(() => {
+  const MM = MockMap; const T = NEON_THEME;
+  const $ = id => document.getElementById(id);
+  const PHASES = ['draft', 'attack', 'fortify', 'commit'];
+  const st = { players: 4, seed: MockUI.randomSeed(), phase: 'draft', map: null, draft: {}, pool: 0, traded: false, attacks: [], fortify: null, sel: null, view: null, box: null };
+
+  /* ---------------- Menu ---------------- */
+  function refreshMenu() {
+    $('pc-val').textContent = st.players;
+    $('seed').value = st.seed;
+    $('pc-dots').innerHTML = Array.from({ length: st.players }, (_, i) => `<span class="${i ? '' : 'you'}" style="--pc:${T.players[i]}">${i ? 'BOT' : 'YOU'}</span>`).join('');
+    const map = MM.generate(st);
+    MM.render($('preview'), map, T, { labels: false, badges: false, arrows: false, preview: true });
+    $('m-stats').innerHTML = `<b>${map.T}</b> territories · <b>${map.C}</b> continents · <b>${map.hexCount}</b> hexes`;
+  }
+  const setPlayers = n => { st.players = Math.max(2, Math.min(8, n)); st.seed = MockUI.randomSeed(); refreshMenu(); };
+  $('pc-minus').onclick = () => setPlayers(st.players - 1);
+  $('pc-plus').onclick = () => setPlayers(st.players + 1);
+  $('reroll').onclick = () => { st.seed = MockUI.randomSeed(); refreshMenu(); };
+  $('seed').oninput = e => { st.seed = e.target.value.toUpperCase() || MockUI.randomSeed(); refreshMenu(); };
+  $('start').onclick = () => { startGame(); show('map'); };
+
+  function show(name) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
+    document.querySelectorAll('[data-screen]').forEach(b => b.classList.toggle('active', b.dataset.screen === name));
+    history.replaceState(null, '', '#' + name);
+    if (name === 'map') { if (!st.map) startGame(); requestAnimationFrame(() => { st.view = null; draw(); }); }
+  }
+  document.querySelectorAll('[data-screen]').forEach(b => b.onclick = () => show(b.dataset.screen));
+
+  /* ---------------- Game state ---------------- */
+  const own = id => st.map.territories[id].owner === 0;
+  const tn = id => st.map.territories[id].name;
+  const pending = () => new Set(st.attacks.map(a => a.to)); // targets we *plan* to hold (enables chained attacks)
+
+  function startGame() {
+    st.map = MM.generate(st);
+    st.map.plan = { attacks: [], fortify: null, selected: null };
+    st.map.territories.forEach(t => { t.baseTroops = t.troops; });
+    const owned = st.map.territories.filter(t => t.owner === 0).length;
+    const cont = st.map.continents.filter(c => c.territoryIds.every(own)).reduce((a, c) => a + c.bonus, 0);
+    st.base = Math.max(3, Math.floor(owned / 3)) + cont;
+    st.pool = st.base; st.draft = {}; st.traded = false; st.attacks = []; st.fortify = null; st.sel = null; st.phase = 'draft'; st.view = null;
+    fillDrawer();
+  }
+
+  function fillDrawer() {
+    const m = st.map; const P = m.players;
+    $('m-players').innerHTML = P.map((p, i) => `<span class="${i ? '' : 'active'}" style="--pc:${T.players[i]}">${p.territories}</span>`).join('');
+    $('roster').innerHTML = P.map((p, i) => `<li class="roster-row ${i ? '' : 'is-active'}" style="--pc:${T.players[i]}"><span class="sw"></span><span class="nm">${p.name}</span>
+      <span class="st"><i>${p.territories}<em>TER</em></i><i>${p.troops}<em>TRP</em></i><i>${[3, 2, 4, 1, 0, 2, 1, 3][i]}<em>CRD</em></i></span></li>`).join('');
+    $('continents').innerHTML = m.continents.map(c => {
+      const counts = new Array(P.length).fill(0); c.territoryIds.forEach(id => counts[m.territories[id].owner]++);
+      const lead = counts.indexOf(Math.max(...counts));
+      return `<li class="cont-row" style="--cc:${T.continentColors[c.id]};--pc:${T.players[lead]}"><span class="sw"></span><span class="nm">${c.name}</span><span class="bn">+${c.bonus}</span>
+        <span class="bar"><span style="width:${counts[lead] / c.territoryIds.length * 100}%"></span></span><span class="own">${counts[lead]}/${c.territoryIds.length} ${P[lead].name}</span></li>`;
+    }).join('');
+    const rng = MM.mulberry32(MM.hash(st.seed + 'log'));
+    const dice = (n, cls) => `<span class="dice ${cls}">${Array.from({ length: n }, () => 1 + Math.floor(rng() * 6)).sort((a, b) => b - a).map(d => `<span class="die">${d}</span>`).join('')}</span>`;
+    $('battle-log').innerHTML = Array.from({ length: 5 }, (_, i) => {
+      const who = 1 + (i % (P.length - 1)); const t1 = m.territories[Math.floor(rng() * m.T)]; const cap = rng() < 0.4;
+      return `<li><span class="who" style="--pc:${T.players[who]}">${P[who].name}</span><span class="res ${cap ? 'cap' : ''}">${cap ? 'CAPTURED' : '−1 / −1'}</span>
+        <span class="where">${t1.name} → ${m.territories[[...t1.adj][0]].name}</span>${dice(3, 'atk')}${dice(2, 'def')}</li>`;
+    }).join('');
+  }
+
+  /* ---------------- Rendering ---------------- */
+  function validTargets() {
+    const m = st.map; const sel = st.sel; if (sel === null) return null;
+    if (st.phase === 'attack') {
+      const targeted = new Set(st.attacks.map(a => a.to));
+      return new Set([...m.territories[sel].adj].filter(n => !own(n) && !targeted.has(n)));
+    }
+    if (st.phase === 'fortify') {
+      const seen = new Set([sel]); const q = [sel];
+      while (q.length) { const c = q.shift(); for (const n of m.territories[c].adj) if (own(n) && !seen.has(n)) { seen.add(n); q.push(n); } }
+      seen.delete(sel); return seen;
+    }
+    return null;
+  }
+
+  function draw() {
+    const svg = $('map'); const board = $('board');
+    const portrait = board.clientHeight > board.clientWidth;
+    st.map.plan = { attacks: st.attacks, fortify: st.fortify, selected: st.sel };
+    const hl = validTargets();
+    st.box = MM.render(svg, st.map, T, { rotate: portrait, highlight: hl ? new Set([...hl, st.sel]) : null });
+    if (!st.view || st.view.rot !== portrait) st.view = { ...st.box, rot: portrait };
+    applyView();
+    svg.querySelectorAll('.terr').forEach(g => g.addEventListener('click', e => { if (!drag.moved) onTap(+g.dataset.t); }));
+    renderSheet();
+  }
+  function applyView() {
+    const v = st.view; const svg = $('map');
+    svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
+    svg.classList.toggle('zoomed', v.w < st.box.w * 0.72);
+  }
+
+  /* ---------------- Pan / pinch / wheel ---------------- */
+  const drag = { pts: new Map(), moved: false, start: null };
+  const board = $('board');
+  const unitsPerPx = () => Math.max(st.view.w / board.clientWidth, st.view.h / board.clientHeight);
+  function zoomAt(f, cx, cy) {
+    const v = st.view; const r = board.getBoundingClientRect(); const u = unitsPerPx();
+    const k = Math.min(Math.max(f, st.box.w * 0.25 / v.w), st.box.w * 1.1 / v.w);
+    const wx = v.x + (cx - r.left) * u - (board.clientWidth * u - v.w) / 2; const wy = v.y + (cy - r.top) * u - (board.clientHeight * u - v.h) / 2;
+    st.view = { ...v, x: wx - (wx - v.x) * k, y: wy - (wy - v.y) * k, w: v.w * k, h: v.h * k };
+    applyView();
+  }
+  board.addEventListener('pointerdown', e => { drag.pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); drag.moved = false; drag.start = { x: e.clientX, y: e.clientY }; });
+  board.addEventListener('pointermove', e => {
+    if (!drag.pts.has(e.pointerId)) return;
+    const prev = drag.pts.get(e.pointerId); const cur = { x: e.clientX, y: e.clientY };
+    if (Math.hypot(cur.x - drag.start.x, cur.y - drag.start.y) > 6) drag.moved = true;
+    if (drag.pts.size === 1 && drag.moved) {
+      const u = unitsPerPx(); st.view = { ...st.view, x: st.view.x - (cur.x - prev.x) * u, y: st.view.y - (cur.y - prev.y) * u }; applyView();
+    } else if (drag.pts.size === 2) {
+      const [a, b] = [...drag.pts.entries()].map(([id, p]) => id === e.pointerId ? cur : p);
+      const [pa, pb] = [...drag.pts.values()];
+      const d0 = Math.hypot(pa.x - pb.x, pa.y - pb.y); const d1 = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d0 > 0) zoomAt(d0 / d1, (a.x + b.x) / 2, (a.y + b.y) / 2);
+    }
+    drag.pts.set(e.pointerId, cur);
+  });
+  const up = e => { drag.pts.delete(e.pointerId); };
+  board.addEventListener('pointerup', up); board.addEventListener('pointercancel', up);
+  board.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.deltaY > 0 ? 1.15 : 0.87, e.clientX, e.clientY); }, { passive: false });
+  $('fit').onclick = () => { st.view = { ...st.box, rot: st.view.rot }; applyView(); };
+
+  /* ---------------- Interaction ---------------- */
+  let toastTimer;
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1600); }
+  function pop(id) {
+    const t = st.map.territories[id]; const c = st.map.continents[t.continent];
+    const p = $('pop'); p.style.setProperty('--pc', T.players[t.owner]);
+    p.innerHTML = `<span class="sw"></span><div><b>${t.name}</b><br><small>${st.map.players[t.owner].name} · ${c.name} +${c.bonus}</small></div><span class="tr">${t.troops}</span>`;
+    p.classList.add('show');
+    clearTimeout(pop.t); pop.t = setTimeout(() => p.classList.remove('show'), 2500);
+  }
+
+  function onTap(id) {
+    pop(id);
+    const t = st.map.territories[id];
+    if (st.phase === 'draft') {
+      if (!own(id)) return toast('Place troops on your own territories');
+      if (!st.pool) return toast('No troops left — tap ATTACK ▸');
+      st.pool--; st.draft[id] = (st.draft[id] || 0) + 1; t.troops++;
+    } else if (st.phase === 'attack') {
+      const pend = pending();
+      if (st.sel === null) {
+        if (!own(id) && !pend.has(id)) return toast('Tap one of your territories first');
+        if (own(id) && t.troops < 2) return toast('Need at least 2 troops to attack');
+        st.sel = id;
+      } else if (id === st.sel) st.sel = null;
+      else if (validTargets().has(id)) {
+        st.attacks.push({ from: st.sel, to: id, chain: !own(st.sel), stop: 2, occupy: 'ALL−1' });
+        st.sel = null; toast(`Queued #${st.attacks.length}: ${tn(st.attacks.at(-1).from)} → ${t.name}`);
+      } else if (own(id) || pend.has(id)) st.sel = id;
+      else return toast('Target must border your selection');
+    } else if (st.phase === 'fortify') {
+      if (!own(id)) return toast('Fortify between your own territories');
+      if (st.sel === null) { if (t.troops < 2) return toast('Need at least 2 troops to move'); st.sel = id; }
+      else if (id === st.sel) st.sel = null;
+      else if (validTargets().has(id)) { st.fortify = { from: st.sel, to: id, troops: st.map.territories[st.sel].troops - 1 }; st.sel = null; }
+      else return toast('Must be connected through your territories');
+    }
+    draw();
+  }
+
+  function setPhase(p) { st.phase = p; st.sel = null; draw(); }
+  $('phases').querySelectorAll('button').forEach(b => b.onclick = () => setPhase(b.dataset.p));
+
+  function renderSheet() {
+    const idx = PHASES.indexOf(st.phase);
+    $('phases').querySelectorAll('button').forEach((b, i) => { b.classList.toggle('active', i === idx); b.classList.toggle('done', i < idx); });
+    $('badge-draft').textContent = st.pool || '';
+    $('badge-attack').textContent = st.attacks.length || '';
+    const next = PHASES[idx + 1];
+    const nextBtn = next ? `<button class="btn primary" data-go="${next}">${next.toUpperCase()} ▸</button>` : '';
+    const s = $('sheet');
+
+    if (st.phase === 'draft') {
+      const chips = Object.entries(st.draft).map(([id, n]) => `<span>${tn(id)}<b>+${n}</b></span>`).join('') || '<span class="empty">Tap your territories to place troops</span>';
+      s.innerHTML = `
+        <div class="big"><span class="n">${st.pool}</span><span class="t">TROOPS TO PLACE<small>${st.base} base + continents${st.traded ? ' + 10 cards' : ''}</small></span>
+          <button class="chip-btn" id="trade" ${st.traded ? 'disabled' : ''}>INF·CAV·ART<small>${st.traded ? 'TRADED' : 'TRADE +10'}</small></button></div>
+        <div class="chips">${chips}</div>
+        <div class="actions"><button class="btn ghost" id="undo">UNDO</button>${nextBtn}</div>`;
+      $('trade').onclick = () => { st.traded = true; st.pool += 10; draw(); toast('Card set traded: +10 troops'); };
+      $('undo').onclick = () => { for (const [id, n] of Object.entries(st.draft)) st.map.territories[id].troops -= n; st.pool += Object.values(st.draft).reduce((a, b) => a + b, 0); st.draft = {}; draw(); };
+    } else if (st.phase === 'attack') {
+      const rows = st.attacks.map((a, i) => `<div class="atk-item ${a.chain ? 'chain' : ''}"><span class="no">${i + 1}</span>
+        <span class="p">${a.chain ? '↳ ' : ''}${tn(a.from)}<em>→</em>${tn(a.to)}</span>
+        <button class="o" data-stop="${i}">STOP≤${a.stop}</button><button class="o" data-occ="${i}">${a.occupy}</button><button class="x" data-rm="${i}">×</button></div>`).join('');
+      s.innerHTML = `
+        <div class="hint">${st.sel === null ? 'Tap <b>your territory</b>, then a <b>pulsing enemy</b> to queue an attack. Captured targets can chain.' : `From <b>${tn(st.sel)}</b> — tap a pulsing target`}</div>
+        <div class="atk-list">${rows || '<div class="note">No attacks queued. You can also skip straight to fortify.</div>'}</div>
+        <div class="actions"><button class="btn ghost" data-go="draft">◂</button>${nextBtn}</div>`;
+      const STOPS = [1, 2, 3, 5]; const OCC = ['ALL−1', 'HALF', 'MIN'];
+      s.querySelectorAll('[data-stop]').forEach(b => b.onclick = () => { const a = st.attacks[b.dataset.stop]; a.stop = STOPS[(STOPS.indexOf(a.stop) + 1) % STOPS.length]; renderSheet(); });
+      s.querySelectorAll('[data-occ]').forEach(b => b.onclick = () => { const a = st.attacks[b.dataset.occ]; a.occupy = OCC[(OCC.indexOf(a.occupy) + 1) % OCC.length]; renderSheet(); });
+      s.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+        // Removing an attack also drops any chained attacks that depended on capturing its target.
+        const drop = new Set([+b.dataset.rm]); let grew = true;
+        while (grew) { grew = false; st.attacks.forEach((a, i) => { if (!drop.has(i) && a.chain && [...drop].some(d => st.attacks[d].to === a.from)) { drop.add(i); grew = true; } }); }
+        st.attacks = st.attacks.filter((_, i) => !drop.has(i)); draw();
+      });
+    } else if (st.phase === 'fortify') {
+      const f = st.fortify; const max = f ? st.map.territories[f.from].troops - 1 : 0;
+      s.innerHTML = `
+        <div class="hint">${st.sel === null ? 'One move per turn: tap a <b>source</b>, then any <b>connected</b> territory.' : `From <b>${tn(st.sel)}</b> — tap a pulsing destination`}</div>
+        ${f ? `<div class="fort">${tn(f.from)}<em>⇢</em>${tn(f.to)}<div class="stepper"><button id="f-m">−</button><b>${f.troops}</b><button id="f-p">+</button></div></div>` : '<div class="note">Optional. Skip if you want to keep your lines as they are.</div>'}
+        <div class="actions"><button class="btn ghost" data-go="attack">◂</button>${f ? '<button class="btn" id="f-clear">CLEAR</button>' : ''}${nextBtn}</div>`;
+      if (f) {
+        $('f-m').onclick = () => { f.troops = Math.max(1, f.troops - 1); renderSheet(); };
+        $('f-p').onclick = () => { f.troops = Math.min(max, f.troops + 1); renderSheet(); };
+        $('f-clear').onclick = () => { st.fortify = null; draw(); };
+      }
+    } else {
+      const placed = Object.values(st.draft).reduce((a, b) => a + b, 0);
+      s.innerHTML = `
+        <div class="summary"><div><b>${placed}</b><small>PLACED</small></div><div><b>${st.attacks.length}</b><small>ATTACKS</small></div><div><b>${st.fortify ? 1 : 0}</b><small>FORTIFY</small></div></div>
+        <div class="note">${st.pool ? `<span style="color:var(--sun)">${st.pool} troops still unplaced.</span> ` : ''}Your whole turn gets signed and locked. Dice stay sealed until the next commander reveals their seed.</div>
+        <div class="actions"><button class="btn ghost" data-go="fortify">◂</button><button class="btn primary" id="commit" ${st.pool ? 'disabled' : ''}>COMMIT TURN</button></div>`;
+      $('commit').onclick = commit;
+    }
+    s.querySelectorAll('[data-go]').forEach(b => b.onclick = () => setPhase(b.dataset.go));
+  }
+
+  function commit() {
+    const seal = $('seal'); seal.className = 'seal show';
+    const h = (MM.hash(JSON.stringify([st.seed, st.draft, st.attacks, st.fortify])) >>> 0).toString(16).padStart(8, '0');
+    $('seal-title').textContent = 'SEALING TURN'; $('seal-hash').textContent = `commit ${h}…${h.slice(0, 4)}`;
+    $('seal-msg').textContent = 'Signing your plan…'; $('seal-ok').style.display = 'none';
+    setTimeout(() => { $('seal-msg').innerHTML = `Waiting for <b style="color:${T.players[1]}">${st.map.players[1].name}</b> to reveal the turn seed…`; }, 900);
+    setTimeout(() => {
+      seal.classList.add('done'); $('seal-title').textContent = 'TURN LOCKED';
+      $('seal-msg').innerHTML = 'Seed revealed ✓<br>In the real build, the battle replay plays here.'; $('seal-ok').style.display = 'block';
+    }, 2200);
+  }
+  $('seal-ok').onclick = () => { $('seal').className = 'seal'; };
+
+  $('open-drawer').onclick = () => $('drawer').classList.add('open');
+  $('drawer').onclick = e => { if (e.target.id === 'drawer') $('drawer').classList.remove('open'); };
+  addEventListener('resize', () => { if (st.map && $('screen-map').classList.contains('active')) { st.view = null; draw(); } });
+
+  refreshMenu();
+  show(location.hash === '#map' ? 'map' : 'menu');
+})();
+</script>
+</body>
+</html>

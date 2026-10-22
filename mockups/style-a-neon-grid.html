@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Style A — Neon Grid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/mock.css">
+<style>
+:root {
+  --bg: #07010f; --bg2: #120428; --mag: #ff2bd6; --cyan: #19f6ff; --violet: #8a2be2; --sun: #ffb800;
+  --txt: #ece6ff; --dim: #9b8cc4;
+  --glass: rgba(22, 6, 48, .55); --line: rgba(25, 246, 255, .35);
+  --display: 'Orbitron', 'Segoe UI', sans-serif; --mono: 'Share Tech Mono', ui-monospace, monospace;
+}
+body { background: var(--bg); color: var(--txt); font-family: var(--mono); }
+h3 { font: 700 11px var(--display); letter-spacing: .25em; color: var(--cyan); margin: 0 0 10px; text-shadow: 0 0 8px var(--cyan); }
+.glass {
+  background: var(--glass); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 0 24px rgba(255, 43, 214, .15), inset 0 0 30px rgba(25, 246, 255, .05);
+}
+
+/* ---------- MENU ---------- */
+#screen-menu { overflow: hidden; background: linear-gradient(180deg, #05010c 0%, #1a0538 42%, #4a0b5e 58%, #07010f 58.2%); }
+.stars { position: absolute; inset: 0 0 42% 0; background-image:
+  radial-gradient(1px 1px at 12% 22%, #fff8, transparent), radial-gradient(1px 1px at 32% 8%, #fff6, transparent),
+  radial-gradient(1.5px 1.5px at 72% 18%, #fffa, transparent), radial-gradient(1px 1px at 88% 34%, #fff6, transparent),
+  radial-gradient(1px 1px at 55% 30%, #fff5, transparent), radial-gradient(1px 1px at 6% 40%, #fff7, transparent),
+  radial-gradient(1.5px 1.5px at 44% 14%, #fff9, transparent), radial-gradient(1px 1px at 93% 9%, #fff7, transparent); }
+.sun {
+  position: absolute; left: 50%; top: 58%; width: 46vh; height: 46vh; transform: translate(-50%, -88%); border-radius: 50%;
+  background: linear-gradient(180deg, #ffe45c 0%, #ff9d2b 35%, #ff2bd6 75%, #8a2be2 100%);
+  -webkit-mask: linear-gradient(180deg, #000 0 52%, transparent 52% 56%, #000 56% 64%, transparent 64% 69%, #000 69% 76%, transparent 76% 82%, #000 82% 88%, transparent 88% 95%, #000 95%);
+          mask: linear-gradient(180deg, #000 0 52%, transparent 52% 56%, #000 56% 64%, transparent 64% 69%, #000 69% 76%, transparent 76% 82%, #000 82% 88%, transparent 88% 95%, #000 95%);
+  filter: drop-shadow(0 0 40px #ff2bd6aa);
+}
+.floor-wrap { position: absolute; left: 0; right: 0; top: 58%; bottom: 0; perspective: 300px; overflow: hidden; }
+.floor {
+  position: absolute; left: -50%; right: -50%; top: 0; height: 200%; transform-origin: top; transform: rotateX(72deg);
+  background-image: linear-gradient(var(--mag) 2px, transparent 2px), linear-gradient(90deg, var(--mag) 2px, transparent 2px);
+  background-size: 60px 60px; animation: floor 1.6s linear infinite; opacity: .75;
+  -webkit-mask: linear-gradient(180deg, #000 10%, transparent 70%); mask: linear-gradient(180deg, #000 10%, transparent 70%);
+}
+@keyframes floor { to { background-position: 0 60px; } }
+.horizon { position: absolute; left: 0; right: 0; top: 58%; height: 2px; background: var(--cyan); box-shadow: 0 0 20px 4px var(--cyan); }
+
+.menu-wrap { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 4vh 3vw 3vh; gap: 3vh; }
+.title-block { text-align: center; }
+.kicker { font: 500 12px var(--display); letter-spacing: .6em; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+.title { margin: .6vh 0 0; font: 900 clamp(48px, 8.5vw, 128px)/0.95 var(--display); letter-spacing: .04em; font-style: italic;
+  background: linear-gradient(180deg, #fff 0%, #b9f6ff 40%, #19f6ff 50%, #ff2bd6 51%, #ffb3f1 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 12px rgba(255, 43, 214, .8)) drop-shadow(0 4px 0 #3b0a5c); }
+.sub { margin-top: 1vh; font: 500 13px var(--display); letter-spacing: .5em; color: var(--mag); text-shadow: 0 0 10px var(--mag); }
+
+.menu-panel { width: min(1400px, 100%); flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1.5fr 0.9fr; gap: 22px; padding: 22px; margin-top: auto; }
+.col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.field label { display: block; font: 700 10px var(--display); letter-spacing: .3em; color: var(--dim); margin-bottom: 8px; }
+.modes { display: grid; gap: 8px; }
+.mode { text-align: left; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(25,246,255,.05); color: var(--txt); font: 700 13px var(--display); letter-spacing: .1em; }
+.mode small { display: block; font: 12px var(--mono); color: var(--dim); letter-spacing: .05em; margin-top: 3px; }
+.mode.active { border-color: var(--cyan); background: rgba(25,246,255,.12); box-shadow: 0 0 16px rgba(25,246,255,.4), inset 0 0 12px rgba(25,246,255,.2); }
+.mode.locked { opacity: .45; cursor: not-allowed; }
+.pc { display: flex; gap: 6px; }
+.pc-btn { flex: 1; padding: 9px 0; border-radius: 8px; border: 1px solid rgba(255,43,214,.4); background: transparent; color: var(--txt); font: 700 15px var(--display); }
+.pc-btn.active { background: var(--mag); color: #120428; box-shadow: 0 0 18px var(--mag); border-color: var(--mag); }
+.slots { display: grid; gap: 5px; overflow: auto; }
+.slot { display: grid; grid-template-columns: 10px 28px 1fr auto; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,.03); font-size: 13px; }
+.slot .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 10px var(--pc); }
+.slot .idx { color: var(--dim); } .slot .nm { color: var(--pc); letter-spacing: .08em; } .slot .tp { font-size: 11px; color: var(--dim); }
+
+.prev-frame { flex: 1; min-height: 0; border-radius: 12px; border: 1px solid rgba(255,43,214,.35); background: radial-gradient(ellipse at center, rgba(138,43,226,.18), transparent 70%); padding: 10px; position: relative; }
+.prev-frame::after { content: 'LIVE MAP PREVIEW'; position: absolute; top: 10px; left: 14px; font: 700 9px var(--display); letter-spacing: .3em; color: var(--mag); }
+.prev-frame svg { width: 100%; height: 100%; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.stat { text-align: center; padding: 8px; border-radius: 8px; background: rgba(25,246,255,.06); }
+.stat b { display: block; font: 900 22px var(--display); color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+.stat small { font-size: 9px; letter-spacing: .2em; color: var(--dim); }
+.seed-row { display: flex; gap: 6px; }
+.seed-row input { flex: 1; min-width: 0; background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 8px; color: var(--cyan); font: 18px var(--mono); padding: 9px 12px; letter-spacing: .15em; outline: none; }
+.seed-row input:focus { box-shadow: 0 0 14px rgba(25,246,255,.5); }
+.seed-row button { width: 46px; border-radius: 8px; border: 1px solid var(--mag); background: transparent; color: var(--mag); font-size: 20px; }
+.rules { display: flex; flex-wrap: wrap; gap: 6px; }
+.rules span { font-size: 11px; padding: 5px 9px; border-radius: 99px; border: 1px solid rgba(255,184,0,.4); color: var(--sun); }
+.start { margin-top: auto; padding: 20px; border-radius: 12px; border: 0; font: 900 18px var(--display); letter-spacing: .25em; color: #120428;
+  background: linear-gradient(90deg, var(--cyan), var(--mag)); box-shadow: 0 0 30px rgba(255,43,214,.6), 0 0 60px rgba(25,246,255,.3); transition: transform .15s; }
+.start:hover { transform: translateY(-2px) scale(1.01); }
+
+/* ---------- GAME ---------- */
+#screen-map { background:
+  radial-gradient(ellipse at 50% 45%, rgba(138,43,226,.22), transparent 65%),
+  linear-gradient(rgba(255,43,214,.05) 1px, transparent 1px) 0 0/40px 40px,
+  linear-gradient(90deg, rgba(255,43,214,.05) 1px, transparent 1px) 0 0/40px 40px, var(--bg); }
+.game { height: 100%; display: grid; gap: 12px; padding: 12px; grid-template-columns: 290px 1fr 330px; grid-template-rows: 62px 1fr 128px; }
+.topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 22px; padding: 0 20px; }
+.brand { font: 900 italic 20px var(--display); letter-spacing: .08em; background: linear-gradient(90deg, var(--cyan), var(--mag)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.turn { display: flex; align-items: baseline; gap: 8px; } .turn small { color: var(--dim); letter-spacing: .3em; font-size: 10px; }
+.turn b { font: 900 26px var(--display); color: var(--sun); text-shadow: 0 0 12px var(--sun); }
+.active-player { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; border: 1px solid var(--cyan); box-shadow: 0 0 12px rgba(25,246,255,.4); }
+.active-player .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 8px var(--pc); }
+.active-player .nm { font: 700 13px var(--display); letter-spacing: .1em; } .active-player small { color: var(--dim); font-size: 10px; letter-spacing: .2em; }
+.phases { display: flex; gap: 4px; margin: 0 auto; padding: 0; list-style: none; }
+.phases li { font: 700 10px var(--display); letter-spacing: .2em; padding: 7px 14px; border-radius: 99px; color: var(--dim); border: 1px solid rgba(155,140,196,.25); }
+.phases li.done { color: var(--cyan); border-color: rgba(25,246,255,.4); }
+.phases li.current { color: #120428; background: var(--mag); border-color: var(--mag); box-shadow: 0 0 16px var(--mag); }
+.hash { display: flex; gap: 14px; font-size: 11px; } .hash small { color: var(--dim); margin-right: 6px; letter-spacing: .15em; } .hash code { color: var(--cyan); }
+
+.left, .right { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.left { grid-row: 2 / 4; } .right { grid-row: 2 / 4; grid-column: 3; }
+.panel { padding: 14px; min-height: 0; overflow: auto; }
+.roster-row { display: grid; grid-template-columns: 10px 1fr; gap: 4px 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 5px; border: 1px solid transparent; }
+.roster-row.is-active { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 10%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--pc) 40%, transparent); }
+.roster-row .sw { grid-row: 1 / 3; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 10px var(--pc); }
+.roster-row .nm { color: var(--pc); font: 700 12px var(--display); letter-spacing: .1em; }
+.roster-row .st { display: flex; gap: 12px; font-size: 13px; } .st i { font-style: normal; } .st em { font-style: normal; color: var(--dim); font-size: 9px; margin-left: 3px; }
+.cont-row { display: grid; grid-template-columns: 8px 1fr auto; gap: 4px 8px; align-items: center; padding: 6px 4px; font-size: 12px; }
+.cont-row .sw { width: 8px; height: 8px; transform: rotate(45deg); background: var(--cc); box-shadow: 0 0 8px var(--cc); }
+.cont-row .bn { color: var(--sun); font: 700 12px var(--display); }
+.cont-row .bar { grid-column: 2 / 4; height: 3px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
+.cont-row .bar span { display: block; height: 100%; background: var(--pc); box-shadow: 0 0 6px var(--pc); }
+.cont-row .own { grid-column: 2 / 4; font-size: 10px; color: var(--dim); }
+
+.board { grid-row: 2; grid-column: 2; position: relative; border-radius: 16px; border: 1px solid rgba(255,43,214,.3); box-shadow: inset 0 0 60px rgba(7,1,15,.9), 0 0 30px rgba(255,43,214,.12); overflow: hidden; }
+.board svg { width: 100%; height: 100%; }
+.board .corner { position: absolute; font: 700 10px var(--display); letter-spacing: .25em; color: var(--dim); }
+.board .corner.tl { top: 12px; left: 16px; } .board .corner.br { bottom: 12px; right: 16px; color: var(--mag); }
+.terr { cursor: pointer; } .terr .hex { transition: fill-opacity .15s; } .terr:hover .hex { fill-opacity: .38; }
+.flow { animation: flow 1s linear infinite; } @keyframes flow { to { stroke-dashoffset: -16; } }
+
+.rf-row, .rf-total { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; color: var(--dim); }
+.rf-row b { color: var(--txt); }
+.rf-total { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--line); align-items: baseline; }
+.rf-total span { font: 700 11px var(--display); letter-spacing: .2em; color: var(--txt); } .rf-total b { font: 900 28px var(--display); color: var(--sun); text-shadow: 0 0 12px var(--sun); margin-left: auto; margin-right: 10px; }
+.rf-total small { font-size: 10px; color: #39ff14; }
+.cards { display: flex; gap: 5px; align-items: center; margin: 8px 0 2px; }
+.card { width: 38px; height: 50px; border-radius: 6px; display: grid; place-items: center; font: 700 9px var(--display); border: 1px solid; }
+.card.inf { color: var(--cyan); border-color: var(--cyan); box-shadow: inset 0 0 10px rgba(25,246,255,.3); }
+.card.cav { color: var(--mag); border-color: var(--mag); box-shadow: inset 0 0 10px rgba(255,43,214,.3); }
+.card.art { color: var(--sun); border-color: var(--sun); box-shadow: inset 0 0 10px rgba(255,184,0,.3); }
+.card-arrow { margin-left: auto; font: 900 16px var(--display); color: var(--sun); }
+.draft-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 8px; margin-top: 4px; border-radius: 6px; background: rgba(25,246,255,.05); }
+.draft-row b { color: #39ff14; }
+.atk-row { display: grid; grid-template-columns: 22px 1fr 18px; gap: 4px 8px; align-items: center; padding: 8px; margin-bottom: 6px; border-radius: 10px; border: 1px solid rgba(255,43,214,.35); background: rgba(255,43,214,.06); }
+.atk-row.chain { margin-left: 16px; border-style: dashed; }
+.atk-row .no { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--mag); color: #120428; font: 900 11px var(--display); box-shadow: 0 0 10px var(--mag); }
+.atk-row .path { font-size: 12px; } .atk-row .arr { color: var(--mag); margin: 0 6px; }
+.atk-row .opts { grid-column: 2 / 4; display: flex; gap: 4px; flex-wrap: wrap; }
+.opt { font-size: 10px; padding: 2px 7px; border-radius: 99px; border: 1px solid rgba(155,140,196,.4); color: var(--dim); } .opt.tag { border-color: var(--sun); color: var(--sun); }
+.x { background: none; border: 0; color: var(--dim); font-size: 16px; padding: 0; }
+.fort-row { display: flex; gap: 8px; align-items: center; font-size: 12px; padding: 8px; border-radius: 10px; border: 1px dashed var(--cyan); }
+.fort-row .arr { color: var(--cyan); } .fort-row b { margin-left: auto; color: var(--cyan); font: 900 14px var(--display); }
+.commit { padding: 16px; border: 0; border-radius: 12px; font: 900 14px var(--display); letter-spacing: .2em; color: #120428; background: linear-gradient(90deg, var(--cyan), var(--mag)); box-shadow: 0 0 26px rgba(255,43,214,.5); }
+.commit-note { font-size: 10px; color: var(--dim); text-align: center; line-height: 1.5; margin-top: -4px; }
+
+.log { grid-row: 3; grid-column: 2; padding: 12px 16px; overflow: hidden; }
+.log h3 { margin-bottom: 6px; }
+.log li { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 2px 0; white-space: nowrap; }
+.log .turn { color: var(--dim); font-size: 10px; } .log .who { color: var(--pc); min-width: 82px; } .log .where { color: var(--txt); min-width: 230px; }
+.dice { display: inline-flex; gap: 3px; } .die { width: 17px; height: 17px; border-radius: 4px; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+.dice.atk .die { background: var(--mag); color: #120428; } .dice.def .die { background: var(--cyan); color: #120428; }
+.vs { color: var(--dim); font-size: 10px; } .res { color: var(--dim); } .res.cap { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+</style>
+</head>
+<body>
+<nav class="mock-switch"><a href="index.html">◂ All styles</a><span class="label">A · Neon Grid</span><button data-screen="menu">Menu</button><button data-screen="map">Map</button></nav>
+
+<section class="screen" id="screen-menu">
+  <div class="stars"></div><div class="sun"></div>
+  <div class="floor-wrap"><div class="floor"></div></div><div class="horizon"></div>
+  <div class="menu-wrap">
+    <header class="title-block">
+      <div class="kicker">◢ PROCEDURAL HEX WARFARE ◣</div>
+      <h1 class="title">NEON DOMINION</h1>
+      <div class="sub">NOSTR · NATIVE · CONQUEST</div>
+    </header>
+    <div class="menu-panel glass">
+      <div class="col">
+        <div class="field"><label>GAME MODE</label>
+          <div class="modes">
+            <button class="mode active">SINGLE PLAYER<small>You vs. dumb bots · local commit-reveal</small></button>
+            <button class="mode locked">NOSTR MULTIPLAYER<small>Unlocks in Phase 2</small></button>
+          </div>
+        </div>
+        <div class="field"><label>COMMANDERS</label><div id="pc-buttons" class="pc"></div></div>
+        <div class="field" style="min-height:0;display:flex;flex-direction:column"><label>ROSTER</label><ul id="slots" class="slots"></ul></div>
+      </div>
+      <div class="col">
+        <div class="prev-frame"><svg id="preview"></svg></div>
+        <div id="map-stats" class="stats"></div>
+      </div>
+      <div class="col">
+        <div class="field"><label>MAP SEED</label><div class="seed-row"><input id="seed" spellcheck="false"><button id="randomize" title="Randomize">⟳</button></div></div>
+        <div class="field"><label>RULESET</label><div class="rules"><span>CLASSIC RISK</span><span>FIXED CARD SETS</span><span>CONNECTED FORTIFY</span><span>WHOLE-TURN COMMIT</span></div></div>
+        <button id="start" class="start">START ▸</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-map">
+  <div class="game">
+    <header class="topbar glass">
+      <div class="brand">NEON DOMINION</div>
+      <div class="turn"><small>TURN</small><b id="turn-num"></b></div>
+      <div class="active-player" id="active-player"></div>
+      <ol class="phases"><li class="done">CARDS</li><li class="done">DRAFT</li><li class="current">ATTACK</li><li>FORTIFY</li><li>COMMIT</li></ol>
+      <div class="hash" id="state-hash"></div>
+    </header>
+    <aside class="left">
+      <div class="panel glass"><h3>COMMANDERS</h3><ul id="roster"></ul></div>
+      <div class="panel glass" style="flex:1"><h3>CONTINENTS</h3><ul id="continents"></ul></div>
+    </aside>
+    <main class="board"><svg id="map"></svg><span class="corner tl">SECTOR GRID · HEX-CLUSTER v1</span><span class="corner br">● PLANNING MODE</span></main>
+    <footer class="log glass"><h3>LAST TURN · BATTLE LOG</h3><ul id="battle-log"></ul></footer>
+    <aside class="right">
+      <div class="panel glass"><h3>REINFORCEMENTS</h3><div id="reinforce"></div><ul id="draft-list"></ul></div>
+      <div class="panel glass" style="flex:1"><h3>ATTACK QUEUE</h3><ul id="attack-queue"></ul></div>
+      <div class="panel glass"><h3>FORTIFY</h3><div id="fortify"></div></div>
+      <button class="commit">COMMIT &amp; EXECUTE</button>
+      <div class="commit-note">Signs your full turn plan. Dice are unknown until the next commander reveals their seed.</div>
+    </aside>
+  </div>
+</section>
+
+<script src="shared/mockmap.js"></script>
+<script src="shared/mockui.js"></script>
+<script src="shared/theme-neon.js"></script>
+<script>
+if (innerWidth < 700 && !location.search.includes("desktop")) location.replace("style-a-mobile.html");
+MockUI.init(NEON_THEME);
+</script>
+</body>
+</html>

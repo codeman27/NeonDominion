@@ -1,0 +1,20 @@
+/* Mockup chrome only (not part of any art style) */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+ul { list-style: none; margin: 0; padding: 0; }
+button { font: inherit; cursor: pointer; }
+.screen { display: none; position: fixed; inset: 0; }
+.screen.active { display: block; }
+.screen * { scrollbar-width: thin; scrollbar-color: rgba(128,128,128,.35) transparent; }
+.panel, .slots { overflow-x: hidden !important; }
+
+.mock-switch {
+  position: fixed; z-index: 9999; right: 12px; bottom: 12px; display: flex; gap: 4px;
+  font: 600 11px/1 system-ui, sans-serif; background: rgba(255,255,255,.92); padding: 4px; border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.5);
+}
+.mock-switch a, .mock-switch button {
+  all: unset; cursor: pointer; padding: 7px 10px; border-radius: 5px; color: #222; letter-spacing: .04em;
+}
+.mock-switch .active { background: #222; color: #fff; }
+.mock-switch .label { padding: 7px 8px; color: #888; }

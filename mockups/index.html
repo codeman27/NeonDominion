@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Neon Dominion — Art Direction</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #111; color: #eee; font: 15px/1.5 system-ui, sans-serif; padding: 28px 36px 48px; }
+h1 { margin: 0 0 4px; font-size: 24px; } p.lead { margin: 0 0 24px; color: #999; }
+.choice { display: grid; grid-template-columns: 340px 1fr; gap: 24px; margin-bottom: 34px; padding: 20px; background: #1a1a1a; border-radius: 12px; }
+.choice h2 { margin: 0 0 6px; font-size: 20px; } .choice h2 span { color: #888; font-weight: 400; }
+.choice ul { padding-left: 18px; color: #bbb; font-size: 14px; } .choice li { margin-bottom: 4px; }
+.links { display: flex; gap: 8px; margin-top: 12px; }
+.links a { padding: 8px 14px; border-radius: 6px; background: #2c2c2c; color: #fff; text-decoration: none; font-size: 13px; } .links a:hover { background: #444; }
+.frames { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #000; }
+.frame iframe { position: absolute; top: 0; left: 0; width: 1600px; height: 900px; border: 0; transform-origin: 0 0; pointer-events: none; }
+.frame span { position: absolute; left: 8px; bottom: 8px; font-size: 11px; background: rgba(0,0,0,.7); padding: 2px 8px; border-radius: 4px; }
+.frame.phone { aspect-ratio: 390 / 844; border-radius: 18px; }
+.frame.phone iframe { width: 390px; height: 844px; }
+</style>
+</head>
+<body>
+<h1>Neon Dominion — art direction</h1>
+<p class="lead">Chosen: <b style="color:#ff2bd6">A · Neon Grid</b>, mobile-first. B and C are kept for reference. Each new game gets a random map; the seed lives under Advanced so a map can be shared or replayed.</p>
+
+<section class="choice" style="outline:2px solid #ff2bd6">
+  <div>
+    <h2>A · Neon Grid — Mobile <span>primary target</span></h2>
+    <ul>
+      <li>Full-screen map that auto-rotates in portrait (view only; map data is identical on every device)</li>
+      <li>One phase at a time in a bottom sheet: Draft → Attack → Fortify → Commit</li>
+      <li>Tap to draft; tap your territory, then a pulsing enemy to queue an attack. Chained attacks are supported</li>
+      <li>Names appear only when zoomed in; commanders, continents, and the log live in the ☰ drawer</li>
+      <li>Pinch/drag (or wheel) to zoom/pan, ⤢ to fit</li>
+    </ul>
+    <div class="links"><a href="style-a-mobile.html#menu">Open mobile</a><a href="style-a-neon-grid.html?desktop#menu">Open desktop</a></div>
+  </div>
+  <div class="frames" style="grid-template-columns: 220px 220px 1fr; align-items: start">
+    <div class="frame phone"><iframe src="style-a-mobile.html#menu" loading="lazy"></iframe><span>Menu</span></div>
+    <div class="frame phone"><iframe src="style-a-mobile.html#map" loading="lazy"></iframe><span>Map</span></div>
+    <div class="frame"><iframe src="style-a-neon-grid.html?desktop#map" loading="lazy"></iframe><span>Desktop map</span></div>
+  </div>
+</section>
+<p class="lead" style="margin-top:8px">Reference styles:</p>
+
+<section class="choice">
+  <div>
+    <h2>A · Neon Grid <span>synthwave / Tron</span></h2>
+    <ul>
+      <li>Retro sunset, animated perspective grid floor, chrome-gradient title</li>
+      <li>Glowing neon territory outlines, translucent glass panels, rounded shapes</li>
+      <li>Flowing dashed attack arrows; feels arcade-y and energetic</li>
+    </ul>
+    <div class="links"><a href="style-a-neon-grid.html#menu">Open menu</a><a href="style-a-neon-grid.html#map">Open map</a></div>
+  </div>
+  <div class="frames">
+    <div class="frame"><iframe src="style-a-neon-grid.html#menu" loading="lazy"></iframe><span>Menu</span></div>
+    <div class="frame"><iframe src="style-a-neon-grid.html#map" loading="lazy"></iframe><span>Map</span></div>
+  </div>
+</section>
+
+<section class="choice">
+  <div>
+    <h2>B · Holo-Tactical <span>military hologram / Ghost in the Shell</span></h2>
+    <ul>
+      <li>Phosphor-green CRT console with scanlines, a boot log, and a blinking cursor</li>
+      <li>Hatched territory fills, coordinate grid, bracketed panels, and a rotating target reticle</li>
+      <li>Amber for actions/alerts; reads as a serious war-room</li>
+    </ul>
+    <div class="links"><a href="style-b-holo-tactical.html#menu">Open menu</a><a href="style-b-holo-tactical.html#map">Open map</a></div>
+  </div>
+  <div class="frames">
+    <div class="frame"><iframe src="style-b-holo-tactical.html#menu" loading="lazy"></iframe><span>Menu</span></div>
+    <div class="frame"><iframe src="style-b-holo-tactical.html#map" loading="lazy"></iframe><span>Map</span></div>
+  </div>
+</section>
+
+<section class="choice">
+  <div>
+    <h2>C · Corpo Glitch <span>Cyberpunk 2077 / hazard</span></h2>
+    <ul>
+      <li>Hazard-yellow diagonal slab with an RGB-split glitch title and a big stacked menu</li>
+      <li>Bold flat fills, thick black borders, angular cut-corner panels, and hazard stripes</li>
+      <li>Highest contrast and most “brand”-like; slanted troop tags</li>
+    </ul>
+    <div class="links"><a href="style-c-corpo-glitch.html#menu">Open menu</a><a href="style-c-corpo-glitch.html#map">Open map</a></div>
+  </div>
+  <div class="frames">
+    <div class="frame"><iframe src="style-c-corpo-glitch.html#menu" loading="lazy"></iframe><span>Menu</span></div>
+    <div class="frame"><iframe src="style-c-corpo-glitch.html#map" loading="lazy"></iframe><span>Map</span></div>
+  </div>
+</section>
+
+<script>
+const fit = () => document.querySelectorAll('.frame').forEach(f => { const ifr = f.querySelector('iframe'); f.querySelector('iframe').style.transform = `scale(${f.clientWidth / ifr.offsetWidth})`; });
+addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

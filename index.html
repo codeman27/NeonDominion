@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#07010f">
+  <title>Neon Dominion — Map Lab</title>
+</head>
+<body>
+  <div class="lab">
+    <header class="lab-top">
+      <div class="brand">NEON DOMINION <small>MAP LAB</small></div>
+      <button class="icon" id="fit" title="Fit map" aria-label="Fit map">⤢</button>
+    </header>
+
+    <main class="board" id="board">
+      <svg id="map" role="img" aria-label="Generated map"></svg>
+      <div class="pill glass" id="pill" hidden></div>
+    </main>
+
+    <section class="panel glass">
+      <div class="panel-body">
+      <div class="row">
+        <span class="lbl">COMMANDERS</span>
+        <div class="stepper"><button id="pc-minus" aria-label="Fewer">−</button><b id="pc-val">4</b><button id="pc-plus" aria-label="More">+</button></div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <details class="legend-wrap" id="legend-wrap">
+        <summary>CONTINENTS</summary>
+        <ul class="legend" id="legend"></ul>
+      </details>
+      <div class="seed-row"><span class="lbl">SEED</span><code id="seed"></code><button id="copy" class="mini">COPY LINK</button></div>
+      </div>
+      <button class="primary" id="generate">⟳ GENERATE NEW MAP</button>
+    </section>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
