@@ -7,6 +7,15 @@ const SIZE = 20;
 
 export interface ViewBox { x: number; y: number; w: number; h: number }
 
+/** A planned order drawn on the map (curved, animated). */
+export interface MapArrow {
+  from: number;
+  to: number;
+  kind: 'attack' | 'fortify';
+  /** Short label in the arrow's badge, e.g. "1" or "F". */
+  label: string;
+}
+
 export interface MapRenderOptions {
   /** 'continent' tints territories by continent (map lab); 'owner' uses player colors (gameplay). */
   colorMode: 'continent' | 'owner';
@@ -18,6 +27,11 @@ export interface MapRenderOptions {
   labels?: boolean;
   continentLabels?: boolean;
   selected?: number | null;
+  /** When set, these territories pulse as valid targets and every other territory (except `selected`) dims. */
+  highlight?: ReadonlySet<number> | null;
+  /** Territories that received troops this turn (drawn with a lime ring). */
+  boosted?: ReadonlySet<number>;
+  arrows?: readonly MapArrow[];
   /** Small thumbnail rendering (menu preview): thicker fills, no text. */
   preview?: boolean;
 }
@@ -73,6 +87,8 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
   const defs = el('defs', {}, svg);
   defs.innerHTML = `
     <filter id="${pfx}glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="${pfx}ah-attack" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0L10,5L0,10z" fill="${NEON.mag}"/></marker>
+    <marker id="${pfx}ah-fortify" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0L10,5L0,10z" fill="${NEON.cyan}"/></marker>
 `;
   const glow = `url(#${pfx}glow)`;
   const layer = (name: string, attrs: Record<string, string> = {}) => el('g', { class: `layer-${name}`, ...attrs }, svg);
@@ -80,6 +96,7 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
   const gBorders = layer('borders', { filter: glow });
   const gInner = layer('inner-borders');
   const gLanes = layer('sea-lanes', { filter: glow });
+  const gArrows = layer('arrows', { filter: glow });
   const gBadges = layer('badges');
   const gLabels = layer('labels');
   const gContinents = layer('continent-labels');
@@ -102,7 +119,8 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
   // Hex fills, grouped per territory for hit-testing.
   for (const t of map.territories) {
     const c = colorOf(t);
-    const g = el('g', { class: `terr${opts.selected === t.id ? ' selected' : ''}`, 'data-t': t.id }, gFill);
+    const hl = opts.highlight && opts.selected !== t.id ? (opts.highlight.has(t.id) ? ' target' : ' dim') : '';
+    const g = el('g', { class: `terr${opts.selected === t.id ? ' selected' : ''}${hl}`, 'data-t': t.id }, gFill);
     for (const h of t.hexes) {
       el('polygon', {
         class: 'hex',
@@ -147,11 +165,29 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
     for (const p of [a, b]) el('circle', { cx: p.x, cy: p.y, r: 2.6, fill: NEON.cyan }, gLanes);
   }
 
+  for (const a of opts.arrows ?? []) {
+    const A = center(map.territories[a.from].labelHex); const B = center(map.territories[a.to].labelHex);
+    const dx = B.x - A.x; const dy = B.y - A.y; const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len; const uy = dy / len;
+    const s = { x: A.x + ux * 12, y: A.y + uy * 12 }; const e = { x: B.x - ux * 15, y: B.y - uy * 15 };
+    const c = { x: (s.x + e.x) / 2 - uy * len * 0.22, y: (s.y + e.y) / 2 + ux * len * 0.22 };
+    const color = a.kind === 'attack' ? NEON.mag : NEON.cyan;
+    el('path', {
+      class: 'flow', d: `M${s.x},${s.y}Q${c.x},${c.y} ${e.x},${e.y}`, fill: 'none', stroke: color, 'stroke-width': a.kind === 'attack' ? 3 : 2.4,
+      'stroke-dasharray': a.kind === 'attack' ? '10 6' : '4 4', 'stroke-linecap': 'round', 'marker-end': `url(#${pfx}ah-${a.kind})`,
+    }, gArrows);
+    const mx = 0.25 * s.x + 0.5 * c.x + 0.25 * e.x; const my = 0.25 * s.y + 0.5 * c.y + 0.25 * e.y;
+    el('circle', { cx: mx, cy: my, r: 7, fill: color }, gArrows);
+    text(gArrows, mx, my + 0.5, a.label, { fill: '#120428', 'font-family': NEON.fontDisplay, 'font-weight': 900, 'font-size': 8 });
+  }
+
   if (!opts.preview) {
     for (const t of map.territories) {
       const p = center(t.labelHex); const c = colorOf(t);
       if (opts.badges !== false) {
         if (opts.troops) {
+          if (opts.boosted?.has(t.id)) el('circle', { cx: p.x, cy: p.y, r: 13.5, fill: 'none', stroke: NEON.lime, 'stroke-width': 1.6, 'stroke-dasharray': '3 2' }, gBadges);
+          if (opts.selected === t.id) el('circle', { class: 'sel-ring', cx: p.x, cy: p.y, r: 15, fill: 'none', stroke: NEON.sun, 'stroke-width': 1.6, 'stroke-dasharray': '3 3' }, gBadges);
           el('circle', { cx: p.x, cy: p.y, r: 10, fill: '#0b0219', stroke: c, 'stroke-width': 1.8, filter: glow }, gBadges);
           text(gBadges, p.x, p.y + 0.6, opts.troops[t.id], { fill: c, 'font-family': NEON.fontDisplay, 'font-weight': 700, 'font-size': 10 });
         } else {

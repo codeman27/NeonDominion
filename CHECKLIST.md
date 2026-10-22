@@ -179,12 +179,14 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Goal: screen router; the main menu from the mockup with Solo / Nostr 🔒, a commanders stepper, a live map preview reusing the Map Lab renderer, ⟳ New Map, Advanced seed, and Start. Keep the Map Lab reachable (for example at `?lab`).
   - Spec: §9.3.1.
   - Notes: Written by Copilot, so no separate review was needed. `index.html` is now just `#app`; the router is in `src/ui/app.ts`. CSS is split into `base.css`, `lab.css` and `menu.css`. The Map Lab is at `?lab` and linked from Advanced. A Continue button is wired but stays hidden until 1.19 adds saving.
-- [ ] **1.15 Setup placement screen** `🟡 LOCAL + REVIEW` ← **NEXT**
+- [x] **1.15 Setup placement screen** `🟡 LOCAL + REVIEW`
   - Goal: show dealt territories in player colors; tap to place starting troops; confirm. Bots place instantly.
-- [ ] **1.16 Game board & phase sheet** `🔴 FRONTIER`
+  - Notes: Built together with 1.16 in `src/ui/screens/gameScreen.ts`. Setup uses tap-to-place with a ×1/×5/ALL step and DEPLOY. Bots set up instantly.
+- [x] **1.16 Game board & phase sheet** `🔴 FRONTIER`
   - Goal: full-screen map in owner colors with troop badges; bottom sheet for Draft → Attack (chained orders, stop/occupy chips) → Fortify → Commit; ☰ intel drawer; territory info pill; pan / pinch / zoom.
   - Spec: §9.2–9.3.2.
-- [ ] **1.17 Commit overlay & battle replay** `🔴 FRONTIER`
+  - Notes: Owner-colored map with troop badges. The bottom sheet runs Draft (card hand, TRADE best set, mandatory-trade gate) → Attack (tap source, then a pulsing target; chains; STOP and OCCUPY chips; removing an attack also removes its dependent chains) → Fortify (connected destinations, stepper) → Commit (validated with `validateTurnPlan`). Also includes the ☰ drawer (roster, continents, battle log), a tap pill, and pan/pinch/zoom. Fixed two tap bugs found while testing: overlay layers and the info pill are now click-through. Bot turns currently play with a short pause; 1.17 adds the replay.
+- [ ] **1.17 Commit overlay & battle replay** `🔴 FRONTIER` ← **NEXT**
   - Goal: sealing → reveal overlay; replay player (camera follows each battle, dice waves, captures, Skip / 1× / 2×); bot turns replay too, with an "auto-skip bots" setting.
   - Spec: §9.3.3.
 - [ ] **1.18 Victory & text inspector** `🟢 LOCAL`

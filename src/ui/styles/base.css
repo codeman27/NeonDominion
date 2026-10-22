@@ -47,3 +47,15 @@ ul { list-style: none; margin: 0; padding: 0; }
 .mini { border: 1px solid var(--line); background: none; border-radius: 99px; padding: 6px 10px; font: 700 9px var(--display); letter-spacing: .12em; color: var(--cyan); }
 .primary { height: 54px; flex: none; border: 0; border-radius: 14px; font: 900 14px var(--display); letter-spacing: .18em; color: #120428; background: linear-gradient(90deg, var(--cyan), var(--mag)); box-shadow: 0 0 22px rgba(255, 43, 214, .5); }
 .primary:active { transform: scale(.98); }
+
+/* Gameplay map states */
+.terr.dim { opacity: .35; }
+.terr.target .hex { animation: target-pulse 1s ease-in-out infinite; }
+@keyframes target-pulse { 50% { fill-opacity: .08; } }
+.flow { animation: flow 1s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -16; } }
+@media (prefers-reduced-motion: reduce) { .flow, .lane, .terr.target .hex { animation: none; } }
+.toast { position: absolute; left: 50%; bottom: 10px; transform: translate(-50%, 20px); opacity: 0; padding: 8px 14px; border-radius: 99px; font-size: 11px; white-space: nowrap; background: rgba(7, 1, 15, .92); border: 1px solid var(--mag); transition: .25s; pointer-events: none; z-index: 5; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+/* Only territory fills receive taps; everything drawn on top is click-through. */
+.layer-borders, .layer-inner-borders, .layer-sea-lanes, .layer-arrows, .layer-badges, .layer-labels, .layer-continent-labels { pointer-events: none; }
