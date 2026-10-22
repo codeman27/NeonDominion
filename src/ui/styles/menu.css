@@ -1,0 +1,46 @@
+/* Main menu (mobile-first; centered card on desktop). Ported from mockups/style-a-mobile.html. */
+.menu { position: relative; height: 100dvh; overflow: hidden; background: linear-gradient(180deg, #05010c 0%, #1a0538 24%, #4a0b5e 33%, #07010f 33.2%); }
+.menu .stars { position: absolute; inset: 0 0 67% 0; background-image: radial-gradient(1px 1px at 12% 22%, #fff8, transparent), radial-gradient(1px 1px at 32% 48%, #fff6, transparent),
+  radial-gradient(1.5px 1.5px at 72% 18%, #fffa, transparent), radial-gradient(1px 1px at 88% 54%, #fff6, transparent), radial-gradient(1px 1px at 55% 10%, #fff5, transparent); }
+.menu .sun { position: absolute; left: 50%; top: 33%; width: 190px; height: 190px; transform: translate(-50%, -78%); border-radius: 50%;
+  background: linear-gradient(180deg, #ffe45c 0%, #ff9d2b 35%, #ff2bd6 75%, #8a2be2 100%);
+  -webkit-mask: linear-gradient(180deg, #000 0 52%, transparent 52% 56%, #000 56% 64%, transparent 64% 69%, #000 69% 76%, transparent 76% 82%, #000 82%);
+          mask: linear-gradient(180deg, #000 0 52%, transparent 52% 56%, #000 56% 64%, transparent 64% 69%, #000 69% 76%, transparent 76% 82%, #000 82%);
+  filter: drop-shadow(0 0 30px #ff2bd6aa); }
+.menu .floor-wrap { position: absolute; left: 0; right: 0; top: 33%; bottom: 0; perspective: 220px; overflow: hidden; }
+.menu .floor { position: absolute; left: -60%; right: -60%; top: 0; height: 200%; transform-origin: top; transform: rotateX(72deg);
+  background-image: linear-gradient(var(--mag) 2px, transparent 2px), linear-gradient(90deg, var(--mag) 2px, transparent 2px);
+  background-size: 44px 44px; animation: menu-floor 1.6s linear infinite; opacity: .6;
+  -webkit-mask: linear-gradient(180deg, #000 5%, transparent 55%); mask: linear-gradient(180deg, #000 5%, transparent 55%); }
+@keyframes menu-floor { to { background-position: 0 44px; } }
+@media (prefers-reduced-motion: reduce) { .menu .floor { animation: none; } }
+.menu .horizon { position: absolute; left: 0; right: 0; top: 33%; height: 2px; background: var(--cyan); box-shadow: 0 0 16px 3px var(--cyan); }
+
+.menu-col { position: relative; height: 100%; max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding: calc(28px + var(--safe-t)) 18px calc(18px + var(--safe-b)); }
+.menu .m-title { text-align: center; }
+.menu .kicker { font: 500 9px var(--display); letter-spacing: .5em; color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+.menu .title { margin: 6px 0 0; font: 900 italic 46px/.95 var(--display); letter-spacing: .03em;
+  background: linear-gradient(180deg, #fff 0%, #b9f6ff 40%, #19f6ff 50%, #ff2bd6 51%, #ffb3f1 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 43, 214, .8)) drop-shadow(0 3px 0 #3b0a5c); }
+.menu .m-card { margin-top: auto; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 12px; background: rgba(0, 0, 0, .35); }
+.seg button { border: 0; background: none; padding: 10px; border-radius: 9px; font: 700 12px var(--display); letter-spacing: .15em; color: var(--dim); }
+.seg button.active { background: var(--cyan); color: #120428; box-shadow: 0 0 14px rgba(25, 246, 255, .5); }
+.seg button:disabled { opacity: .5; cursor: not-allowed; }
+.menu .dots { display: flex; gap: 8px; justify-content: center; }
+.menu .dots span { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--pc); box-shadow: 0 0 8px var(--pc); display: grid; place-items: center; font: 700 8px var(--display); color: var(--pc); }
+.menu .dots span.you { background: var(--pc); color: #120428; }
+.menu .m-prev { position: relative; height: 170px; border-radius: 12px; border: 1px solid rgba(255, 43, 214, .35); background: radial-gradient(ellipse, rgba(138, 43, 226, .2), transparent 70%); }
+.menu .m-prev svg { position: absolute; inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); }
+.menu .reroll { position: absolute; right: 8px; bottom: 8px; border: 1px solid var(--cyan); border-radius: 99px; background: rgba(7, 1, 15, .8); padding: 7px 12px; font: 700 10px var(--display); letter-spacing: .15em; color: var(--cyan); }
+.menu .m-stats { text-align: center; font-size: 11px; color: var(--dim); letter-spacing: .08em; margin-top: -4px; }
+.menu .m-stats b { color: var(--cyan); font-weight: 400; }
+.menu .adv summary { font: 700 10px var(--display); letter-spacing: .25em; color: var(--dim); list-style: none; cursor: pointer; }
+.menu .adv summary::after { content: ' ▸'; } .menu .adv[open] summary::after { content: ' ▾'; }
+.menu .adv input { width: 100%; margin-top: 8px; background: rgba(0, 0, 0, .4); border: 1px solid var(--line); border-radius: 10px; color: var(--cyan); font: 16px var(--mono); padding: 10px 12px; letter-spacing: .15em; outline: none; text-transform: uppercase; }
+.menu .adv small { display: block; margin-top: 6px; font-size: 10px; color: var(--dim); }
+.menu .adv a { color: var(--cyan); }
+.menu .start { height: 60px; font-size: 18px; letter-spacing: .3em; border-radius: 16px; }
+.menu .continue { height: 48px; border-radius: 14px; border: 1px solid var(--cyan); background: rgba(7, 1, 15, .6); font: 700 12px var(--display); letter-spacing: .2em; color: var(--cyan); }
+
+@media (min-height: 860px) { .menu .m-prev { height: 220px; } .menu .title { font-size: 56px; } }

@@ -175,10 +175,11 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
 
 ### UI (mobile-first; the 390×844 portrait layout is the primary target)
   - Notes: Event-sourced: `LocalGame.create/restore`, `playBotTurn()` plays one bot turn at a time so the UI can animate, and `replayEventLog` verifies a game from text. Invalid plans don't burn hash-chain secrets.
-- [ ] **1.14 App shell & main menu** `🟡 LOCAL + REVIEW` ← **NEXT**
+- [x] **1.14 App shell & main menu** `🟡 LOCAL + REVIEW`
   - Goal: screen router; the main menu from the mockup with Solo / Nostr 🔒, a commanders stepper, a live map preview reusing the Map Lab renderer, ⟳ New Map, Advanced seed, and Start. Keep the Map Lab reachable (for example at `?lab`).
   - Spec: §9.3.1.
-- [ ] **1.15 Setup placement screen** `🟡 LOCAL + REVIEW`
+  - Notes: Written by Copilot, so no separate review was needed. `index.html` is now just `#app`; the router is in `src/ui/app.ts`. CSS is split into `base.css`, `lab.css` and `menu.css`. The Map Lab is at `?lab` and linked from Advanced. A Continue button is wired but stays hidden until 1.19 adds saving.
+- [ ] **1.15 Setup placement screen** `🟡 LOCAL + REVIEW` ← **NEXT**
   - Goal: show dealt territories in player colors; tap to place starting troops; confirm. Bots place instantly.
 - [ ] **1.16 Game board & phase sheet** `🔴 FRONTIER`
   - Goal: full-screen map in owner colors with troop badges; bottom sheet for Draft → Attack (chained orders, stop/occupy chips) → Fortify → Commit; ☰ intel drawer; territory info pill; pan / pinch / zoom.

@@ -1,0 +1,35 @@
+/* Map Lab screen (?lab). */
+/* Mobile-first: header / map / panel stacked */
+.lab { height: 100dvh; display: flex; flex-direction: column; }
+.lab-top { display: flex; align-items: center; gap: 10px; padding: calc(10px + var(--safe-t)) 12px 6px; }
+
+
+
+.lab .panel { margin: 6px 10px calc(10px + var(--safe-b)); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px; max-height: 46dvh; }
+.lab .panel-body { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stat { text-align: center; padding: 7px 2px; border-radius: 10px; background: rgba(25, 246, 255, .06); }
+.stat b { display: block; font: 900 18px var(--display); color: var(--cyan); }
+.stat.mag b { color: var(--mag); } .stat.sun b { color: var(--sun); }
+.stat small { font-size: 8px; letter-spacing: .15em; color: var(--dim); }
+.legend-wrap summary { font: 700 10px var(--display); letter-spacing: .25em; color: var(--dim); cursor: pointer; list-style: none; }
+.legend-wrap summary::after { content: ' ▸'; } .legend-wrap[open] summary::after { content: ' ▾'; }
+.legend { margin-top: 6px; display: grid; gap: 4px; }
+.legend li { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 8px; align-items: center; font-size: 12px; padding: 5px 6px; border-radius: 8px; background: rgba(255, 255, 255, .03); }
+.legend .sw { width: 10px; height: 10px; transform: rotate(45deg); background: var(--cc); box-shadow: 0 0 8px var(--cc); }
+.legend .n { color: var(--dim); font-size: 11px; }
+.legend .bn { font: 700 12px var(--display); color: var(--sun); min-width: 26px; text-align: right; }
+.seed-row { display: flex; align-items: center; gap: 8px; }
+.seed-row code { flex: 1; color: var(--cyan); font-size: 13px; letter-spacing: .1em; overflow: hidden; text-overflow: ellipsis; }
+
+/* Desktop: map left, panel right */
+@media (min-width: 900px) {
+  .lab { display: grid; grid-template-columns: 1fr 380px; grid-template-rows: auto 1fr; }
+  .lab .lab-top { grid-column: 1 / -1; padding: 14px 18px 4px; }
+  .lab .brand { font-size: 20px; }
+  .lab .board { grid-row: 2; grid-column: 1; margin: 6px 0 14px 14px; }
+  .lab .lab .panel { grid-row: 2; grid-column: 2; margin: 6px 14px 14px; max-height: none; }
+  .lab .lab .panel-body { flex: 1; }
+  .lab .primary { margin-top: auto; }
+  .lab .pill { left: auto; right: 12px; width: 340px; }
+}
