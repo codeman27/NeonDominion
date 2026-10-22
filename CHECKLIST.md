@@ -85,7 +85,7 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - `GameState.territories` must be an **array** indexed by territory id (`TerritoryState[]`), not a `Record`, so key order can never matter. Players are referenced by **index** (`number`) inside `GameState`; `PlayerState.id` stays a string (it will hold a pubkey later).
   - Done when: everything type-checks and matches §6.1–6.2 apart from the two changes above. Record them in ARCHITECTURE §6.
   - Notes: Deviations from §6 are recorded at the top of ARCHITECTURE §6: territories array, seat-index players, map not stored in state, setupTroops in PlayerState, simplified GamePhase.
-- [ ] **1.7 Game setup & deal** `🟢 LOCAL` ← **NEXT**
+- [x] **1.7 Game setup & deal** `🟢 LOCAL`
   - Goal: `createGame({ map, players, setupSeed })`:
     - Deal territories round-robin from a seeded shuffle, 1 troop each.
     - Build and shuffle the card deck (1 card per territory with balanced emblems, plus 2 WILD).
@@ -100,7 +100,8 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
     - `applySetupPlacement` rejects: territories not owned by that player, negative or non-integer amounts, totals that don't equal the pool, and a second submission.
   - Done when: deals are even and deterministic, emblem counts differ by at most 1, the deck has `T+2` cards, and every invalid placement case is rejected.
   - Spec: §4.1.
-- [ ] **1.8 Reinforcements & cards** `🟢 LOCAL`
+  - Notes: `createGame` seeds its RNG with `SHA256('SETUP:gameId:setupSeed')`. `GameRuleError` is in `src/engine/errors.ts`, and shared fixtures are in `src/engine/testing.ts`.
+- [ ] **1.8 Reinforcements & cards** `🟢 LOCAL` ← **NEXT**
   - Goal: `src/engine/rules.ts`:
     - Base reinforcements `max(3, ⌊owned/3⌋)`.
     - Continent bonuses.
