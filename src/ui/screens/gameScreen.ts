@@ -7,6 +7,7 @@ import type { LocalGame } from '../../transport/localTransport';
 import type { AttackCampaignOrder, CardTradeOrder, FortifyOrder, OccupyMode, TurnActionPlan } from '../../types/actions';
 import type { GameState, TerritoryCard, TerritoryId } from '../../types/game';
 import { buildReplay, type ReplayFrame } from '../components/battleReplay';
+import { openEventInspector, showVictory } from '../components/eventInspector';
 import { renderMap, territoryPoint, type MapArrow } from '../components/hexMapRenderer';
 import { MapCamera } from '../components/mapCamera';
 import { NEON } from '../theme';
@@ -244,9 +245,10 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
       const won = s.winnerIndex === me;
       sheet.innerHTML = `
         <div class="big"><span class="n" style="color:${won ? 'var(--lime)' : 'var(--mag)'}">${won ? '★' : '✕'}</span><span class="t">${s.phase === 'GAME_OVER' ? (won ? 'VICTORY' : `${s.players[s.winnerIndex!].name} WINS`) : 'YOU WERE ELIMINATED'}<small>Turn ${s.turnNumber} · ${s.players.length} commanders</small></span></div>
-        <div class="actions">${s.phase === 'GAME_OVER' ? '' : '<button class="btn" id="watch">FINISH ▸▸</button>'}<button class="primary btn" id="menu">MENU</button></div>`;
+        <div class="actions">${s.phase === 'GAME_OVER' ? '<button class="btn" id="stats">STATS</button>' : '<button class="btn" id="watch">FINISH ▸▸</button>'}<button class="primary btn" id="menu">MENU</button></div>`;
       q('#menu').onclick = exit;
-      if (s.phase !== 'GAME_OVER') q('#watch').onclick = () => { void runBots(true); };
+      if (s.phase === 'GAME_OVER') q('#stats').onclick = victory;
+      if (s.phase !== 'GAME_OVER') q('#watch').onclick = async () => { await runBots(true); ui.phase = 'waiting'; await afterAction(); };
     }
     sheet.querySelectorAll<HTMLElement>('[data-go]').forEach(b => b.onclick = () => setPhase(b.dataset.go as Phase));
     sheet.querySelectorAll<HTMLElement>('[data-step]').forEach(b => b.onclick = () => { ui.step = Number(b.dataset.step); renderSheet(); });
@@ -455,9 +457,17 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     if (game.isBotTurn() && !S().players[me].eliminated) await runBots();
     if (!ui.alive) return;
     const s = S();
-    if (s.phase === 'GAME_OVER' || s.players[me].eliminated) ui.phase = 'over';
+    if (s.phase === 'GAME_OVER' || s.players[me].eliminated) {
+      const first = ui.phase !== 'over';
+      ui.phase = 'over';
+      if (first && s.phase === 'GAME_OVER') { draw(); victory(); return; }
+    }
     else if (game.isLocalTurn()) { resetPlan(); ui.phase = 'draft'; }
     draw();
+  }
+
+  function victory(): void {
+    showVictory(q('.game'), game, { onMenu: exit, onLog: () => openEventInspector(q('.game'), game) });
   }
 
   function exit(): void {
@@ -470,6 +480,7 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
   q('#drawer').onclick = e => { if ((e.target as HTMLElement).id === 'drawer') q('#drawer').classList.remove('open'); };
   q('#exit').onclick = () => { if (confirm('Leave this game? (It is saved — you can continue from the menu.)')) exit(); };
   q('#fit').onclick = () => camera.fit();
+  q('#event-log').onclick = () => { q('#drawer').classList.remove('open'); openEventInspector(q('.game'), game); };
   const autoSkip = q<HTMLInputElement>('#auto-skip');
   autoSkip.checked = ui.autoSkipBots;
   autoSkip.onchange = () => { ui.autoSkipBots = autoSkip.checked; localStorage.setItem('nd.autoSkipBots', autoSkip.checked ? '1' : '0'); };
@@ -512,6 +523,7 @@ const GAME_HTML = `
     <h3>CONTINENTS</h3><ul id="continents"></ul>
     <h3>BATTLE LOG</h3><ul class="log" id="log"></ul>
     <h3>SETTINGS</h3><label class="setting"><input type="checkbox" id="auto-skip"> Auto-skip bot replays</label>
+    <button class="btn exit" id="event-log">📜 EVENT LOG</button>
     <button class="btn exit" id="exit">◂ MENU</button>
   </div></div>
   <div class="overlay" id="overlay"></div>

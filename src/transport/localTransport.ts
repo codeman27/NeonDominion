@@ -6,7 +6,7 @@ import { GameRuleError } from '../engine/errors';
 import { MAP_GENERATOR_VERSION, generateMap } from '../engine/mapGenerator';
 import { applySetupPlacement, createGame } from '../engine/setup';
 import { applyTurn, validateTurnPlan, witnessFor } from '../engine/turnEngine';
-import type { SetupPlacementAction, TurnActionPlan } from '../types/actions';
+import type { SetupPlacementAction, TurnActionPlan, TurnResolutionResult } from '../types/actions';
 import type { GameMap, GameState, PlayerIndex } from '../types/game';
 import type { GameCreatePayload, GameEvent, GamePayload, TurnCommitPayload, TurnRevealPayload } from '../types/protocol';
 import type { GameTransport, TurnOutcome } from './transport';
@@ -180,7 +180,7 @@ export class LocalGame implements GameTransport {
  * Rebuilds a game from its text log alone and verifies everything: event ids and order, authorship,
  * map version, every setup, every commit's base state hash, every witness reveal and resulting state hash.
  */
-export function replayEventLog(json: string): { map: GameMap; state: GameState; events: GameEvent[] } {
+export function replayEventLog(json: string, onTurn?: (result: TurnResolutionResult, before: GameState) => void): { map: GameMap; state: GameState; events: GameEvent[] } {
   const events = JSON.parse(json) as GameEvent[];
   const fail = (seq: number, msg: string): never => { throw new GameRuleError(`event ${seq}: ${msg}`); };
   events.forEach((e, i) => {
@@ -211,6 +211,7 @@ export function replayEventLog(json: string): { map: GameMap; state: GameState; 
       if (r.payload.witnessIndex !== witness || r.author !== state.players[witness].id) fail(i + 1, 'reveal from the wrong witness');
       const result = applyTurn(map, state, { plan: p.actionPlan, commitEventId: e.id, revealedSecret: r.payload.revealedSecret });
       if (result.newStateHash !== r.payload.expectedNewStateHash) fail(i + 1, 'state hash mismatch');
+      onTurn?.(result, state);
       state = result.newState;
       i++;
     } else {

@@ -190,10 +190,11 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Goal: sealing → reveal overlay; replay player (camera follows each battle, dice waves, captures, Skip / 1× / 2×); bot turns replay too, with an "auto-skip bots" setting.
   - Spec: §9.3.3.
   - Notes: `buildReplay()` (in `src/ui/components/battleReplay.ts`) is a pure timeline; tests prove every replay ends exactly on the engine's new state. The player tweens the camera to each battle, shows dice with winners and losers, and has 1×/2×/SKIP (speed persists). The sealing overlay shows the real commit id and the revealed secret. Bot turns replay too, with an auto-skip setting in ☰.
-- [ ] **1.18 Victory & text inspector** `🟢 LOCAL` ← **NEXT**
+- [x] **1.18 Victory & text inspector** `🟢 LOCAL`
   - Goal: victory screen with stats; inspector drawer showing the raw JSON events and hash-chain reveals (proves the game is "all text").
   - Uses the event log exported by 1.13. Read-only UI, no engine changes.
-- [ ] **1.19 Desktop layout & polish** `🟡 LOCAL + REVIEW`
+  - Notes: Written by Copilot. `computeGameStats(log)` in `src/transport/gameStats.ts` derives stats by replaying the text log, so they survive resume; `replayEventLog` gained an `onTurn` hook. The victory modal shows captures, kills, losses and peak territories. The event inspector (☰ → EVENT LOG, or from victory) lists raw JSON per event with COPY and VERIFY (rebuilds the game from text).
+- [ ] **1.19 Desktop layout & polish** `🟡 LOCAL + REVIEW` ← **NEXT**
   - Goal: three-column layout at ≥ 700 px, keyboard shortcuts, saving the game to localStorage and resuming.
   - Done when: a full single-player game plays from menu to victory at both 390×844 and 1600×900.
 
