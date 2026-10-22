@@ -216,3 +216,4 @@ _Append a short entry when you stop mid-phase or hand off to another model._
 
 - **2026-10-22**: Steps 0.1–1.3 are done. 115 tests pass. Next up is 1.4. The Map Lab runs with `npm run dev`.
 - **2026-10-22**: 1.4 is done (131 tests). Next up is 1.5. Added model-fit tags. Steps 1.5–1.8 and 1.10 are 🟢 and can go to a local model one at a time; tightened specs for 1.5–1.10 so no design decisions are left to it.
+- **2026-10-22**: Copilot took back over after the local model stalled; its partial `stateHash.ts` was kept and finished. Steps 1.5–1.17 are done, including every 🔴 frontier step in Phase 1. 281 tests pass. The game plays end to end from the menu at 390×844 (`npm run dev`). Left in Phase 1: 1.18 (victory screen and text inspector) and 1.19 (desktop layout, saving and resuming). Phase 2 starts with the 2.1 protocol decisions, which need the owner's input.
