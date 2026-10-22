@@ -21,9 +21,9 @@ export function startedGame(players = 4, seed = 'fixture'): { map: GameMap; stat
 }
 
 /** A started game where every player has a real hash chain (needed for applyTurn). */
-export function chainedGame(players = 3, seed = 'chained'): { map: GameMap; state: GameState; cursors: HashChainCursor[] } {
+export function chainedGame(players = 3, seed = 'chained', chainLength = 500): { map: GameMap; state: GameState; cursors: HashChainCursor[] } {
   const map = generateMap({ seed, playerCount: players });
-  const cursors = Array.from({ length: players }, (_, i) => HashChainCursor.fromRoot(sha256Hex(`root:${seed}:${i}`), 500));
+  const cursors = Array.from({ length: players }, (_, i) => HashChainCursor.fromRoot(sha256Hex(`root:${seed}:${i}`), chainLength));
   const roster = testPlayers(players).map((p, i) => ({ ...p, hashCommitment: cursors[i].initialCommitment }));
   let state = createGame({ gameId: `g-${seed}`, map, players: roster, setupSeed: seed });
   for (let i = 0; i < players; i++) {

@@ -160,11 +160,12 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
 
 ### Bots & local game loop
   - Notes: Full 2-, 3- and 5-player games play to a winner with real hash chains, and their logs replay to an identical final hash. Decisions are recorded in ARCHITECTURE §4.3. Watch out: 500-secret chains could run out in very long games, so step 1.13 should use longer local chains, and 2.1 covers rotation.
-- [ ] **1.12 Dumb bot AI** `🟡 LOCAL + REVIEW` ← **NEXT**
+- [x] **1.12 Dumb bot AI** `🟡 LOCAL + REVIEW`
   - Goal: `src/ai/dumbBot.ts` with setup placement and whole-turn plans.
   - Done when: 100 seeded bots-only games (2–8 players) all finish with a winner, with no invalid plans and no infinite loops (turn cap).
   - Spec: §8.
-- [ ] **1.13 Local transport** `🔴 FRONTIER`
+  - Notes: Written by Copilot, so no separate review was needed. The bot is fully deterministic (ties break by lowest id, integer ratios) and trades every valid set. All 100 seeded games (2–8 players) finish under the 3000-turn cap. Tests use 1500-secret chains.
+- [ ] **1.13 Local transport** `🔴 FRONTIER` ← **NEXT**
   - Goal: `src/transport/localTransport.ts` that:
     - Gives every player (human and bots) a real hash chain.
     - Runs each turn through the actual commit → reveal → `applyTurn` pipeline.
