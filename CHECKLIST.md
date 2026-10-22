@@ -147,7 +147,7 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Done when: tests cover connected, disconnected (owned but no owned path), not-owned, same-territory, and over-move cases.
   - Spec: §4.2.3.
   - Notes: The signature takes the map: `applyFortify(map, state, player, order)`. Also exported `connectedOwned()` for the UI to highlight destinations.
-- [ ] **1.11 Turn engine** `🔴 FRONTIER` ← **NEXT**
+- [x] **1.11 Turn engine** `🔴 FRONTIER`
   - Goal: `validateTurnPlan()` and `applyTurn(state, plan, commitId, revealedSecret)` returning a `TurnResolutionResult`. It handles:
     - Turn seed `SHA256(commitId:secret)`.
     - Draft, attacks, and fortify, in that order.
@@ -159,7 +159,8 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Spec: §4.2, §5.2.
 
 ### Bots & local game loop
-- [ ] **1.12 Dumb bot AI** `🟡 LOCAL + REVIEW`
+  - Notes: Full 2-, 3- and 5-player games play to a winner with real hash chains, and their logs replay to an identical final hash. Decisions are recorded in ARCHITECTURE §4.3. Watch out: 500-secret chains could run out in very long games, so step 1.13 should use longer local chains, and 2.1 covers rotation.
+- [ ] **1.12 Dumb bot AI** `🟡 LOCAL + REVIEW` ← **NEXT**
   - Goal: `src/ai/dumbBot.ts` with setup placement and whole-turn plans.
   - Done when: 100 seeded bots-only games (2–8 players) all finish with a winner, with no invalid plans and no infinite loops (turn cap).
   - Spec: §8.

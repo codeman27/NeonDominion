@@ -237,6 +237,20 @@ The precise implementation rules are spelled out in [CHECKLIST.md](./CHECKLIST.m
 
 Those rules are authoritative and extend this section.
 
+**Turn-engine decisions (step 1.11, `src/engine/turnEngine.ts`):**
+- **Mandatory trade:** with 5+ cards at turn start, the plan must trade until fewer than 5 remain. A hand of 5 or more always contains a valid set.
+- **Cards won by elimination** this turn are traded next turn.
+- **Commit-time validation versus runtime skips.** `validateTurnPlan` rejects anything wrong at commit time:
+  - wrong turn or player;
+  - card problems;
+  - a draft that doesn't sum exactly to `base + continents + card sets` on owned territories (the +2 match troops are placed automatically);
+  - malformed orders, or more than 64 attacks.
+
+  Anything that depends on dice (chains, threshold stops) is a logged skip instead.
+- **Resolution order:** verify the witness reveal → trades and the +2 match → draft → attacks in queue order → fortify → draw 1 card if anything was conquered. If the deck is empty, the discard pile is reshuffled with `turnRng.fork('reshuffle')`. Then check for a win, or advance to the next alive seat.
+- **Dice** come from `DeterministicRng(SHA256(commitId:secret)).fork('dice')`.
+- **A winning turn** ends immediately: no fortify and no card draw.
+
 ---
 
 ## 5. Nostr Protocol, Anti-Cheat RNG, & Multi-Relay Consensus
