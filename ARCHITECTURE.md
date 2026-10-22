@@ -225,6 +225,20 @@ Every regular turn consists of three logical sections inside a single `TurnActio
 
 ---
 
+### 4.3 Exact Engine Rules
+The precise implementation rules are spelled out in [CHECKLIST.md](./CHECKLIST.md) steps 1.7–1.10, so that any model can implement them without making design decisions. They cover:
+- RNG fork labels.
+- Starting troops.
+- Deck emblem assignment (cycling INF/CAV/ART over a seeded shuffle, plus 2 WILDs).
+- WILD set valuation.
+- One +2 territory match per traded set.
+- The conquest move: minimum is the dice rolled in the final wave, maximum is troops − 1, and the occupy mode picks within that range.
+- Skip reasons and fortify clamping.
+
+Those rules are authoritative and extend this section.
+
+---
+
 ## 5. Nostr Protocol, Anti-Cheat RNG, & Multi-Relay Consensus
 
 This section directly solves the two hardest problems in a serverless Nostr strategy game:
