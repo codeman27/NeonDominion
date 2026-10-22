@@ -165,7 +165,7 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Done when: 100 seeded bots-only games (2–8 players) all finish with a winner, with no invalid plans and no infinite loops (turn cap).
   - Spec: §8.
   - Notes: Written by Copilot, so no separate review was needed. The bot is fully deterministic (ties break by lowest id, integer ratios) and trades every valid set. All 100 seeded games (2–8 players) finish under the 3000-turn cap. Tests use 1500-secret chains.
-- [ ] **1.13 Local transport** `🔴 FRONTIER` ← **NEXT**
+- [x] **1.13 Local transport** `🔴 FRONTIER`
   - Goal: `src/transport/localTransport.ts` that:
     - Gives every player (human and bots) a real hash chain.
     - Runs each turn through the actual commit → reveal → `applyTurn` pipeline.
@@ -174,7 +174,8 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
   - Spec: §10.
 
 ### UI (mobile-first; the 390×844 portrait layout is the primary target)
-- [ ] **1.14 App shell & main menu** `🟡 LOCAL + REVIEW`
+  - Notes: Event-sourced: `LocalGame.create/restore`, `playBotTurn()` plays one bot turn at a time so the UI can animate, and `replayEventLog` verifies a game from text. Invalid plans don't burn hash-chain secrets.
+- [ ] **1.14 App shell & main menu** `🟡 LOCAL + REVIEW` ← **NEXT**
   - Goal: screen router; the main menu from the mockup with Solo / Nostr 🔒, a commanders stepper, a live map preview reusing the Map Lab renderer, ⟳ New Map, Advanced seed, and Start. Keep the Map Lab reachable (for example at `?lab`).
   - Spec: §9.3.1.
 - [ ] **1.15 Setup placement screen** `🟡 LOCAL + REVIEW`

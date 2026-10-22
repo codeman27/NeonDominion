@@ -793,6 +793,11 @@ export interface GameTransport {
   - Generates real 500-step SHA-256 hash chains for the human player and every bot at game start!
   - Even in single-player mode, every turn goes through the exact `TurnCommitPayload` -> `TurnRevealPayload` -> `verifyHashChain` -> `applyTurn` pipeline.
   - Provides a **"View Nostr Event Log"** drawer in the UI so the user can inspect the exact text events and state hashes being generated on every turn.
+- **As implemented (step 1.13):** see [`src/transport/transport.ts`](./src/transport/transport.ts), [`localTransport.ts`](./src/transport/localTransport.ts), and [`src/types/protocol.ts`](./src/types/protocol.ts).
+  - **Events** use the envelope `{ id = SHA256(canonical {author, seq, payload}), author, seq, payload }`, with payloads `GAME_CREATE`, `SETUP_PLACEMENT`, `TURN_COMMIT` (carries the hash of the state the plan was made against), and `TURN_REVEAL` (carries `witnessIndex` and `expectedNewStateHash`).
+  - **Chains:** local chains are 2000 secrets long.
+  - **`replayEventLog(text)`** rebuilds and verifies a whole game from the log alone. **`save()`/`restore()`** keep the private chain roots separate from the public log.
+  - **`lastRevealEventId`** stays `null` in state, because a reveal can't contain its own id. In Phase 2 the *next* commit references the previous reveal's id instead.
 - **`NostrMultiplayerTransport` (Phase 2)**:
   - Uses `SimplePool` from `nostr-tools` connected to the match's relay list.
   - Subscribes to `{ kinds: [4333], "#d": [gameId] }`.
