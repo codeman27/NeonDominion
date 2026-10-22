@@ -30,14 +30,18 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
 - [x] **1.2 Deterministic PRNG**: `src/crypto/prng.ts` (SHA-256 counter DRBG, `nextInt`, `shuffle`, `fork`) plus tests. Spec: §7.1.
 - [x] **1.3 Map generator + Map Lab**: continents-first generator, chokepoints, continent bonus `⌊T/3⌋ + entries`, and a Map Lab page with ⟳ Generate New Map. Spec: §3.
   - Notes: `MAP_GENERATOR_VERSION = 2`. Ownership is NOT part of map generation; it's dealt at game start (1.7).
-- [ ] **1.4 Hash chain module** ← **NEXT**
+- [x] **1.4 Hash chain module**
   - Goal: `src/crypto/hashChain.ts` with these functions:
     - `createHashChain(rootSecret, length)` returns `{ head C₀, secrets[] }`.
     - `verifyReveal(prevCommitment, secret)` checks the next reveal against the current head.
     - `advance(prevCommitment, secret)` returns the new head.
   - Done when: tests cover a valid chain, a wrong secret, an out-of-order reveal, and determinism.
   - Spec: §5.1.
-- [ ] **1.5 Canonical state hash**
+  - Notes: done in `src/crypto/hashChain.ts`.
+    - Hashing is over the raw 32 bytes and values are canonical lowercase hex.
+    - The owner side uses `HashChainCursor`, which saves and restores `{ root, length, used }`.
+    - Verification is strictly next-in-order; skipping ahead or replaying a secret is rejected.
+- [ ] **1.5 Canonical state hash** ← **NEXT**
   - Goal: `src/crypto/stateHash.ts` with `canonicalStringify` (sorted keys, no `undefined`, integers only) and `computeStateHash(state)`.
   - Done when: key order doesn't change the hash; any field change does; the hash is pinned to a known vector.
   - Spec: §7.2.
@@ -137,3 +141,4 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` not started · `[!]` blo
 _Append a short entry when you stop mid-phase or hand off to another model._
 
 - **2026-10-22**: Steps 0.1–1.3 are done. 115 tests pass. Next up is 1.4. The Map Lab runs with `npm run dev`.
+- **2026-10-22**: 1.4 is done (131 tests). Next up is 1.5.

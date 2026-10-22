@@ -239,6 +239,10 @@ $$S_k = \text{SHA256}(S_{k+1}), \quad C_0 = S_0 = \text{SHA256}^N(S_N)$$
 The player publishes $C_0$ (the head of their hash chain) in their `GameJoinEvent`.
 - To reveal secret #1, the player publishes $S_1$. Everyone verifies $\text{SHA256}(S_1) === C_0$ in $<0.01\text{ms}$, and updates that player's commitment head to $C_1 = S_1$.
 - **Why this is huge**: Nobody can ever forge or alter their future seed reveals—their entire sequence of secrets $S_1, S_2, \dots, S_N$ was cryptographically locked before the game even started!
+- **Implementation** (`src/crypto/hashChain.ts`):
+  - Each link is `SHA256(raw 32 bytes)`, never the hex text, and all values are canonical lowercase 64-char hex.
+  - The owner uses a `HashChainCursor`. Persist `{ root, length, used }` and rebuild the chain on load (500 hashes takes a few milliseconds).
+  - Verifiers accept only the next secret in order: `SHA256(secret) === currentHead`.
 
 ### 5.2 The 2-Event Whole-Turn Commit-Reveal Lifecycle
 
