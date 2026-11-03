@@ -76,3 +76,29 @@
 #ms-inputs label { margin-top: 6px; }
 
 @media (min-height: 860px) { .menu .m-prev { height: 220px; } .menu .title { font-size: 56px; } }
+
+@media (min-width: 960px) {
+  .menu-col {
+    max-width: 1300px;
+    gap: 18px;
+    padding: 32px 64px calc(20px + var(--safe-b));
+  }
+  .menu .kicker { font: 500 16px var(--display); letter-spacing: .4em; }
+  .menu .title { font: 900 italic 100px/.95 var(--display); margin: 8px 0 0; }
+  .menu .m-card { border-radius: 24px; padding: 28px; gap: 16px; }
+  .seg button { padding: 14px; font: 700 18px var(--display); letter-spacing: .2em; }
+  .lbl { font: 700 15px var(--display); letter-spacing: .3em; }
+  .stepper button { width: 56px; height: 56px; border-radius: 16px; font: 700 28px var(--display); }
+  .stepper b { width: 60px; font: 900 38px var(--display); }
+  .menu .dots { gap: 16px; }
+  .menu .dots span { width: 44px; height: 44px; border-width: 3px; font: 700 11px var(--display); }
+  .menu .m-prev { height: 260px; border-radius: 16px; }
+  .menu .m-prev svg { inset: 12px; }
+  .menu .reroll { padding: 10px 18px; font: 700 14px var(--display); }
+  .menu .m-stats { font-size: 15px; margin-top: -6px; }
+  .menu .adv summary { font: 700 14px var(--display); letter-spacing: .3em; }
+  .menu .adv input { font: 20px var(--mono); padding: 12px 18px; border-radius: 12px; }
+  .menu .adv small { font-size: 13px; margin-top: 8px; }
+  .menu .start { height: 64px; font-size: 24px; letter-spacing: .35em; border-radius: 18px; }
+  .menu .continue { height: 54px; font: 700 16px var(--display); letter-spacing: .25em; }
+}

@@ -158,6 +158,7 @@ fieldset.stop-palette { max-width: 240px; padding: 0; border: 0; }
 .rp-head b { font: 700 12px var(--display); letter-spacing: .1em; color: var(--pc); }
 .rp-head small { color: var(--dim); font-size: 10px; letter-spacing: .15em; }
 .rp-ctl { margin-left: auto; display: flex; gap: 4px; }
+.rp-body { display: flex; flex-direction: column; gap: 10px; }
 .rp-ctl button { border: 1px solid var(--line); background: none; border-radius: 8px; padding: 6px 8px; font: 700 10px var(--display); color: var(--dim); }
 .rp-ctl button.on { background: var(--cyan); color: #120428; }
 .rp-ctl #rp-skip { color: var(--mag); border-color: var(--mag); }

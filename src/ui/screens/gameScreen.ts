@@ -78,7 +78,7 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     /** Interactive attack state: tracks the live GameState during the turn. */
     interactive: null as { state: InteractiveTurnState; lastResult: InteractiveAttackResult | null } | null,
     /** Move step state during interactive attack. */
-    move: null as { from: TerritoryId; to: TerritoryId; troops: number; minMove: number } | null,
+    move: null as { from: TerritoryId; to: TerritoryId; troops: number; minMove: number; maxMove: number } | null,
     /** Pending attack being configured during commit phase. */
     pendingAttack: null as { from: TerritoryId; to: TerritoryId; troops: number } | null,
     /** Stop at this many remaining attacking armies, excluding the reserved army (null = no limit). */
@@ -444,15 +444,24 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
         };
         return `<div class="rp-dice"><div>${f.dice.attacker.map((v, i) => die(v, i, 'a')).join('')}</div><span class="vs">vs</span><div>${f.dice.defender.map((v, i) => die(v, i, 'd')).join('')}</div></div>`;
       })() : '';
-      sheet.innerHTML = `
-        <div class="rp-head" style="--pc:${color(ui.replayWho)}"><span class="sw"></span><b>${s.players[ui.replayWho].name}</b><small>TURN ${roundOf(ui.replayTurn, ui.replayWho)}</small>
-          <div class="rp-ctl">${[1, 2].map(n => `<button data-speed="${n}" class="${ui.speed === n ? 'on' : ''}">${n}×</button>`).join('')}<button id="rp-skip">SKIP ▸▸</button></div></div>
-        <div class="rp-cap ${f.tone ?? ''}">${f.caption}</div>${dice}
-        <div class="rp-sub">${f.sub ?? ''}</div>`;
-      q('#rp-skip').onclick = () => { ui.skip = true; ui.wake?.(); };
-      sheet.querySelectorAll<HTMLElement>('[data-speed]').forEach(b => b.onclick = () => {
-        ui.speed = Number(b.dataset.speed); localStorage.setItem('nd.speed', String(ui.speed)); renderSheet();
-      });
+      const body = `<div class="rp-cap ${f.tone ?? ''}">${f.caption}</div>${dice}<div class="rp-sub">${f.sub ?? ''}</div>`;
+      // Keep the header (and its buttons) stable across frames: replacing a button between
+      // pointerdown and pointerup swallows the click, which made 1×/2×/SKIP feel unresponsive.
+      const key = `${ui.replayWho}:${ui.replayTurn}`;
+      const head = sheet.querySelector<HTMLElement>('.rp-head');
+      if (head?.dataset.key === key) {
+        q('.rp-body').innerHTML = body;
+      } else {
+        sheet.innerHTML = `
+          <div class="rp-head" data-key="${key}" style="--pc:${color(ui.replayWho)}"><span class="sw"></span><b>${s.players[ui.replayWho].name}</b><small>TURN ${roundOf(ui.replayTurn, ui.replayWho)}</small>
+            <div class="rp-ctl">${[1, 2].map(n => `<button data-speed="${n}">${n}×</button>`).join('')}<button id="rp-skip">SKIP ▸▸</button></div></div>
+          <div class="rp-body">${body}</div>`;
+        q('#rp-skip').onclick = () => { ui.skip = true; ui.wake?.(); };
+        sheet.querySelectorAll<HTMLElement>('[data-speed]').forEach(b => b.onclick = () => {
+          ui.speed = Number(b.dataset.speed); localStorage.setItem('nd.speed', String(ui.speed)); renderSheet();
+        });
+      }
+      sheet.querySelectorAll<HTMLElement>('[data-speed]').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === ui.speed));
     } else if (ui.phase === 'move' && ui.pendingAttack) {
       // Attack troop count selection
       const p = ui.pendingAttack;
@@ -801,10 +810,10 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
       // Minimum = attacker dice count (how many you attacked with), max = all but one from source
       const lastWave = result.attack.waves[result.attack.waves.length - 1];
       const minMove = lastWave?.attackerDice?.length ?? maxAttackers;
-      const srcTroops = getScaledTroops(from);
+      const srcTroops = state.liveState.territories[from].troops;
       const maxMove = Math.max(0, srcTroops - 1);
       ui.interactive = { state, lastResult: result };
-      ui.move = { from, to, troops: Math.max(0, Math.min(minMove, maxMove)), minMove };
+      ui.move = { from, to, troops: maxMove, minMove, maxMove };
       ui.pendingAttack = null; // clear so move-phase rendering fires, not pending-attack rendering
       ui.phase = 'move';
       ui.sel = to;
