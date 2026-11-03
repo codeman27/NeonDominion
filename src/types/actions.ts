@@ -20,12 +20,15 @@ export type OccupyMode =
   | { type: 'MIN' }
   | { type: 'HALF' }
   | { type: 'ALL_BUT_ONE' }
-  | { type: 'LEAVE_BEHIND'; leaveTroops: number };
+  | { type: 'LEAVE_BEHIND'; leaveTroops: number }
+  | { type: 'NONE' };
 
 export interface AttackCampaignOrder {
   orderId: string;
   fromTerritoryId: TerritoryId;
   toTerritoryId: TerritoryId;
+  /** Number of dice (attackers) to roll. Defaults to 3 (max). */
+  attackerDice?: number;
   /** Stop rolling further waves once attacker troops on the source are <= this (treated as at least 1). */
   stopWhenAttackerAtOrBelow: number;
   occupyMode: OccupyMode;
@@ -108,4 +111,41 @@ export interface TurnResolutionResult {
   eliminatedPlayers: PlayerIndex[];
   newState: GameState;
   newStateHash: string;
+}
+
+/* ---------------------------------- Interactive attack results ---------------------------------- */
+
+export interface InteractiveAttackResult {
+  /** The attack that was just resolved. */
+  attack: AttackResolutionLog;
+  /** Snapshot of territory owners after this attack. */
+  owners: number[];
+  /** Snapshot of troop counts after this attack. */
+  troops: number[];
+  /** Whether there are more queued attacks remaining. */
+  moreAttacks: boolean;
+  /** Whether the turn is complete (attacks done, fortify applied, game advanced). */
+  turnComplete: boolean;
+}
+
+/** Captures the full interactive turn state after committing but before all attacks resolve. */
+export interface InteractiveTurnState {
+  playerIndex: PlayerIndex;
+  turnNumber: number;
+  turnSeed: string;
+  reinforcements: ReinforcementBreakdown;
+  draftApplied: DraftPlacementOrder[];
+  cardDrawn: boolean;
+  /** True once any interactive attack this turn captured a territory (earns a card at turn end). */
+  conqueredAny: boolean;
+  /** All resolved attacks in execution order, for replay and end-game statistics. */
+  attackLogs: AttackResolutionLog[];
+  eliminatedPlayers: PlayerIndex[];
+  fortify: FortifyResolution | null;
+  /** Remaining attack orders to resolve. */
+  remainingAttacks: AttackCampaignOrder[];
+  /** Live clone of GameState during the interactive turn. */
+  liveState: GameState;
+  /** Last attack result for replay UI. */
+  lastResult: InteractiveAttackResult | null;
 }

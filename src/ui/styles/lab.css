@@ -22,6 +22,18 @@
 .seed-row { display: flex; align-items: center; gap: 8px; }
 .seed-row code { flex: 1; color: var(--cyan); font-size: 13px; letter-spacing: .1em; overflow: hidden; text-overflow: ellipsis; }
 
+/* Border style toggle */
+.border-toggle { margin-top: 8px; }
+.border-toggle .lbl { font: 700 8px var(--display); letter-spacing: .2em; color: var(--dim); display: block; margin-bottom: 4px; }
+.border-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.border-btns .bs { flex: 1; min-width: 60px; border: 1px solid rgba(155, 140, 196, .25); background: rgba(7, 1, 15, .6); border-radius: 8px; padding: 6px 4px; font: 700 8px var(--display); letter-spacing: .12em; color: var(--dim); cursor: pointer; transition: all .15s; }
+.border-btns .bs.on { background: rgba(25, 246, 255, .12); border-color: rgba(25, 246, 255, .5); color: var(--cyan); box-shadow: 0 0 8px rgba(25, 246, 255, .2); }
+.border-btns .bs:hover { border-color: rgba(255, 43, 214, .4); color: var(--sun); }
+
+.owner-toggle { display: flex; align-items: center; gap: 8px; margin-top: 10px; cursor: pointer; }
+.owner-toggle input { width: 16px; height: 16px; accent-color: var(--mag); }
+.owner-toggle .lbl { font: 700 8px var(--display); letter-spacing: .2em; color: var(--dim); }
+
 /* Desktop: map left, panel right */
 @media (min-width: 900px) {
   .lab { display: grid; grid-template-columns: 1fr 380px; grid-template-rows: auto 1fr; }

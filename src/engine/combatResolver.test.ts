@@ -103,6 +103,20 @@ describe('resolveAttack', () => {
     expect(state.territories[a].troops).toBe(1);
   });
 
+  it('keeps rolling after successful waves while still above the stop threshold', () => {
+    const { map, state, a, b } = arena();
+    state.territories[a].troops = 15;
+    state.territories[b].troops = 5;
+    const log = resolveAttack(map, state, 0, order(a, b, {
+      stopWhenAttackerAtOrBelow: 14,
+      occupyMode: { type: 'NONE' },
+    }), script(6, 6, 6, 1, 1, 6, 6, 6, 1, 1, 6, 6, 6, 1));
+
+    expect(log.waves).toHaveLength(3);
+    expect(log.conquered).toBe(true);
+    expect(state.territories[a].troops).toBe(15);
+  });
+
   it.each([
     ['SOURCE_NOT_OWNED', (s: ReturnType<typeof arena>) => order(s.b, s.c)],
     ['TARGET_ALREADY_OWNED', (s: ReturnType<typeof arena>) => { s.state.territories[s.b].owner = 0; return order(s.a, s.b); }],

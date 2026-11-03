@@ -7,33 +7,28 @@ const SIZE = 20;
 
 export interface ViewBox { x: number; y: number; w: number; h: number }
 
-/** A planned order drawn on the map (curved, animated). */
 export interface MapArrow {
   from: number;
   to: number;
   kind: 'attack' | 'fortify';
-  /** Short label in the arrow's badge, e.g. "1" or "F". */
   label: string;
 }
 
 export interface MapRenderOptions {
-  /** 'continent' tints territories by continent (map lab); 'owner' uses player colors (gameplay). */
   colorMode: 'continent' | 'owner';
   owners?: readonly number[];
   troops?: readonly number[];
-  /** Rotate the view 90° (portrait screens). Map data is untouched. */
   rotate?: boolean;
   badges?: boolean;
   labels?: boolean;
   continentLabels?: boolean;
   selected?: number | null;
-  /** When set, these territories pulse as valid targets and every other territory (except `selected`) dims. */
   highlight?: ReadonlySet<number> | null;
-  /** Territories that received troops this turn (drawn with a lime ring). */
   boosted?: ReadonlySet<number>;
+  myTerritories?: ReadonlySet<number> | null;
   arrows?: readonly MapArrow[];
-  /** Small thumbnail rendering (menu preview): thicker fills, no text. */
   preview?: boolean;
+  debugSel?: number | null;
 }
 
 type Pt = { x: number; y: number };
@@ -61,13 +56,16 @@ function medoidPx(points: Pt[]): Pt {
   return best;
 }
 
-/** Board coordinates of a territory's badge, matching `renderMap` (including portrait rotation). */
 export function territoryPoint(map: GameMap, id: number, rotate: boolean): Pt {
   const p = hexToPixel(map.territories[id].labelHex, SIZE);
   return rotate ? { x: -p.y, y: p.x } : p;
 }
 
-/** Renders the map into `svg` and returns the fitted view box (for the camera). */
+/**
+ * Convert hex color to HSL, rotate hue by degrees, convert back.
+ * Pure function — no mutation.
+ */
+/** Renders the map into `svg` and returns the fitted view box. */
 export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptions): ViewBox {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   const rot = opts.rotate ? (p: Pt): Pt => ({ x: -p.y, y: p.x }) : (p: Pt): Pt => p;
@@ -80,7 +78,7 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
   const hexTerr = new Map<string, Territory>();
   for (const t of map.territories) for (const h of t.hexes) hexTerr.set(hexKey(h), t);
 
-  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const t of map.territories) for (const h of t.hexes) for (const [x, y] of corners(h)) {
     minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
   }
@@ -96,6 +94,7 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
     <marker id="${pfx}ah-attack" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0L10,5L0,10z" fill="${NEON.mag}"/></marker>
     <marker id="${pfx}ah-fortify" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0L10,5L0,10z" fill="${NEON.cyan}"/></marker>
 `;
+
   const glow = `url(#${pfx}glow)`;
   const layer = (name: string, attrs: Record<string, string> = {}) => el('g', { class: `layer-${name}`, ...attrs }, svg);
   const gFill = layer('fill');
@@ -111,8 +110,7 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
     ? NEON.players[opts.owners[t.id] % NEON.players.length]
     : NEON.continents[t.continentId % NEON.continents.length];
 
-  // Shade levels: neighbors inside the same continent never share a level, so territory
-  // shapes read clearly even when every territory has the same hue (continent or owner color).
+  // Shade levels for same-continent neighbors
   const SHADES = opts.preview ? [0.2, 0.34, 0.12, 0.27] : [0.07, 0.3, 0.16, 0.4];
   const shade = new Map<number, number>();
   for (const t of map.territories) {
@@ -122,11 +120,16 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
     shade.set(t.id, level);
   }
 
-  // Hex fills, grouped per territory for hit-testing.
+  // --- Hex fills ---
   for (const t of map.territories) {
-    const c = colorOf(t);
+    let c = colorOf(t);
     const hl = opts.highlight && opts.selected !== t.id ? (opts.highlight.has(t.id) ? ' target' : ' dim') : '';
-    const g = el('g', { class: `terr${opts.selected === t.id ? ' selected' : ''}${hl}`, 'data-t': t.id }, gFill);
+    const myClass = (!opts.highlight || !opts.highlight.has(t.id)) && opts.myTerritories?.has(t.id) ? ' my-target' : '';
+    if ((opts.debugSel !== undefined && t.neighbors.includes(opts.debugSel!)) || opts.selected === t.id) {
+      console.log(`[render] t=${t.name}(id=${t.id}) hl="${hl}"`);
+    }
+    const g = el('g', { class: `terr${opts.selected === t.id ? ' selected' : ''}${hl}${myClass}`, 'data-t': t.id }, gFill);
+
     for (const h of t.hexes) {
       el('polygon', {
         class: 'hex',
@@ -138,10 +141,11 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
     }
   }
 
-  // Borders: glowing coastline, white continent junctions, and crisp "etched" lines between
-  // territories (dark gap + bright line) so internal borders don't blend into the hex grid.
-  let coast = ''; let continentEdge = ''; let innerEdge = '';
+  // --- Collect coastline, continent edges, and inner edges per territory ---
+  const coastByTerritory = new Map<number, string>(); // territory id -> coastline path
+  let continentEdge = '', innerEdge = '';
   for (const t of map.territories) {
+    let coast = '';
     for (const h of t.hexes) {
       const c = corners(h);
       DIRS.forEach((d, i) => {
@@ -150,46 +154,60 @@ export function renderMap(svg: SVGSVGElement, map: GameMap, opts: MapRenderOptio
         const seg = `M${c[i][0]},${c[i][1]}L${c[(i + 1) % 6][0]},${c[(i + 1) % 6][1]}`;
         if (!n) coast += seg;
         else if (t.id < n.id) {
-          if (n.continentId !== t.continentId) continentEdge += seg; else innerEdge += seg;
+          if (n.continentId !== t.continentId) continentEdge += seg;
+          else innerEdge += seg;
         }
       });
     }
+    coastByTerritory.set(t.id, coast);
   }
-  el('path', { d: coast, fill: 'none', stroke: NEON.cyan, 'stroke-width': 7, 'stroke-opacity': 0.1, 'stroke-linecap': 'round' }, gBorders);
-  el('path', { d: coast, fill: 'none', stroke: NEON.cyan, 'stroke-width': 1.8, 'stroke-linecap': 'round' }, gBorders);
+
+  // Coastline borders colored by each territory's continent color
+  for (const [tid, d] of coastByTerritory) {
+    if (!d) continue;
+    const col = NEON.continents[map.territories[tid].continentId % NEON.continents.length];
+    el('path', { d, fill: 'none', stroke: col, 'stroke-width': 7, 'stroke-opacity': 0.1, 'stroke-linecap': 'round' }, gBorders);
+    el('path', { d, fill: 'none', stroke: col, 'stroke-width': 1.8, 'stroke-linecap': 'round' }, gBorders);
+  }
+
+  // Continent junction edges (white)
   if (continentEdge) el('path', { d: continentEdge, fill: 'none', stroke: '#fff', 'stroke-width': 2.6, 'stroke-opacity': 0.8, 'stroke-linecap': 'round' }, gBorders);
+
+  // Inner territory borders (etched)
   if (innerEdge && !opts.preview) {
     el('path', { d: innerEdge, fill: 'none', stroke: NEON.bg, 'stroke-width': 3.2, 'stroke-linecap': 'round' }, gInner);
     el('path', { d: innerEdge, fill: 'none', stroke: '#fff', 'stroke-width': 1.1, 'stroke-opacity': 0.75, 'stroke-linecap': 'round' }, gInner);
   }
 
-  // Sea lanes are the only non-obvious connection, so they stay visible as dotted links.
+  // Sea lanes
   for (const cp of map.chokepoints) {
     if (cp.kind !== 'SEA_LANE') continue;
-    const a = center(cp.from); const b = center(cp.to);
+    const a = center(cp.from), b = center(cp.to);
     el('path', { class: 'lane', d: `M${a.x},${a.y}L${b.x},${b.y}`, stroke: NEON.cyan, 'stroke-width': 1.8, 'stroke-dasharray': '1 5', 'stroke-linecap': 'round', fill: 'none' }, gLanes);
     for (const p of [a, b]) el('circle', { cx: p.x, cy: p.y, r: 2.6, fill: NEON.cyan }, gLanes);
   }
 
+  // Arrows
   for (const a of opts.arrows ?? []) {
-    const A = center(map.territories[a.from].labelHex); const B = center(map.territories[a.to].labelHex);
-    const dx = B.x - A.x; const dy = B.y - A.y; const len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len; const uy = dy / len;
-    const s = { x: A.x + ux * 12, y: A.y + uy * 12 }; const e = { x: B.x - ux * 15, y: B.y - uy * 15 };
+    const A = center(map.territories[a.from].labelHex), B = center(map.territories[a.to].labelHex);
+    const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const s = { x: A.x + ux * 12, y: A.y + uy * 12 }, e = { x: B.x - ux * 15, y: B.y - uy * 15 };
     const c = { x: (s.x + e.x) / 2 - uy * len * 0.22, y: (s.y + e.y) / 2 + ux * len * 0.22 };
     const color = a.kind === 'attack' ? NEON.mag : NEON.cyan;
     el('path', {
       class: 'flow', d: `M${s.x},${s.y}Q${c.x},${c.y} ${e.x},${e.y}`, fill: 'none', stroke: color, 'stroke-width': a.kind === 'attack' ? 3 : 2.4,
       'stroke-dasharray': a.kind === 'attack' ? '10 6' : '4 4', 'stroke-linecap': 'round', 'marker-end': `url(#${pfx}ah-${a.kind})`,
     }, gArrows);
-    const mx = 0.25 * s.x + 0.5 * c.x + 0.25 * e.x; const my = 0.25 * s.y + 0.5 * c.y + 0.25 * e.y;
+    const mx = 0.25 * s.x + 0.5 * c.x + 0.25 * e.x, my = 0.25 * s.y + 0.5 * c.y + 0.25 * e.y;
     el('circle', { cx: mx, cy: my, r: 7, fill: color }, gArrows);
     text(gArrows, mx, my + 0.5, a.label, { fill: '#120428', 'font-family': NEON.fontDisplay, 'font-weight': 900, 'font-size': 8 });
   }
 
+  // Badges & labels
   if (!opts.preview) {
     for (const t of map.territories) {
-      const p = center(t.labelHex); const c = colorOf(t);
+      const p = center(t.labelHex), c = colorOf(t);
       if (opts.badges !== false) {
         if (opts.troops) {
           if (opts.boosted?.has(t.id)) el('circle', { cx: p.x, cy: p.y, r: 13.5, fill: 'none', stroke: NEON.lime, 'stroke-width': 1.6, 'stroke-dasharray': '3 2' }, gBadges);

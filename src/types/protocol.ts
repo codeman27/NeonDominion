@@ -1,5 +1,5 @@
-import type { SetupPlacementAction, TurnActionPlan } from './actions';
-import type { PlayerIndex } from './game';
+import type { AttackCampaignOrder, FortifyOrder, SetupPlacementAction, TurnActionPlan } from './actions';
+import type { PlayerIndex, TerritoryId } from './game';
 
 /*
  * Text event envelope shared by the local transport (Phase 1) and the Nostr transport (Phase 2).
@@ -49,6 +49,13 @@ export interface TurnRevealPayload {
   revealedSecret: string;
   /** Hash of the state after applying the turn; every client must reproduce it. */
   expectedNewStateHash: string;
+  /** Local interactive decisions, resolved in order against the committed starting plan. */
+  interactiveSteps?: InteractiveTurnStep[];
 }
+
+export type InteractiveTurnStep =
+  | { kind: 'ATTACK'; order: AttackCampaignOrder }
+  | { kind: 'MOVE'; from: TerritoryId; to: TerritoryId; troops: number }
+  | { kind: 'FORTIFY'; order: FortifyOrder };
 
 export type GamePayload = GameCreatePayload | SetupPlacementPayload | TurnCommitPayload | TurnRevealPayload;

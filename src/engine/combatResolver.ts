@@ -34,6 +34,7 @@ export function conquestMove(mode: OccupyMode, attackerTroops: number, diceRolle
     case 'ALL_BUT_ONE': return max;
     case 'HALF': return clamp(Math.floor(attackerTroops / 2));
     case 'LEAVE_BEHIND': return clamp(attackerTroops - mode.leaveTroops);
+    case 'NONE': return 0;
   }
 }
 
@@ -52,11 +53,20 @@ export function resolveAttack(map: GameMap, state: GameState, player: PlayerInde
   log.defenderIndex = dst.owner;
   if (!map.territories[from].neighbors.includes(to)) return { ...log, skippedReason: 'NOT_ADJACENT' };
   const stopAt = Math.max(1, Math.floor(order.stopWhenAttackerAtOrBelow));
-  if (src.troops < 2 || src.troops <= stopAt) return { ...log, skippedReason: 'INSUFFICIENT_TROOPS' };
+  if (src.troops < 2) return { ...log, skippedReason: 'INSUFFICIENT_TROOPS' };
+  // If stopAt >= src.troops, the while loop would never execute — treat as insufficient
+  if (stopAt >= src.troops) return { ...log, skippedReason: 'INSUFFICIENT_TROOPS' };
+
+  // Limit attacker dice to the specified count (max 3)
+  const maxDice = Math.min(3, order.attackerDice ?? 3, src.troops - 1);
+  if (maxDice < 1) return { ...log, skippedReason: 'INSUFFICIENT_TROOPS' };
 
   let lastDice = 0;
   while (dst.troops > 0 && src.troops > stopAt) {
-    const w = resolveWave(src.troops, dst.troops, rollD6);
+    // Pass src.troops to resolveWave so it derives aCount = min(3, src.troops-1)
+    // but cap at maxDice by limiting src.troops passed in
+    const effectiveTroops = Math.min(src.troops, maxDice + 1);
+    const w = resolveWave(effectiveTroops, dst.troops, rollD6);
     src.troops -= w.attackerLosses;
     dst.troops -= w.defenderLosses;
     lastDice = w.attackerDice.length;

@@ -1,7 +1,7 @@
 import type { CardEmblem, GameMap, GameState, PlayerIndex, TerritoryCard, TerritoryId } from '../types/game';
 
 /** Fixed set values (ARCHITECTURE §4.2.1). */
-export const SET_VALUES = { INFANTRY: 4, CAVALRY: 6, ARTILLERY: 8, ONE_OF_EACH: 10 } as const;
+export const SET_VALUES = { INFANTRY: 3, CAVALRY: 6, ARTILLERY: 8, ONE_OF_EACH: 10 } as const;
 export const MANDATORY_TRADE_HAND_SIZE = 5;
 export const TERRITORY_MATCH_BONUS = 2;
 
@@ -56,8 +56,9 @@ export function bestSet(hand: readonly TerritoryCard[]): { cardIds: [number, num
   const sorted = [...hand].sort((a, b) => a.id - b.id);
   let best: { cardIds: [number, number, number]; value: number } | null = null;
   for (let i = 0; i < sorted.length; i++) for (let j = i + 1; j < sorted.length; j++) for (let k = j + 1; k < sorted.length; k++) {
-    const value = cardSetValue([sorted[i], sorted[j], sorted[k]]);
-    if (value !== null && (!best || value > best.value)) best = { cardIds: [sorted[i].id, sorted[j].id, sorted[k].id], value };
+    const a = sorted[i], b = sorted[j], c = sorted[k];
+    const value = cardSetValue([a, b, c]);
+    if (value !== null && (!best || value > best.value)) best = { cardIds: [a.id, b.id, c.id], value };
   }
   return best;
 }

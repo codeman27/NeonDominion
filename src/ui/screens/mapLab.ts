@@ -29,6 +29,7 @@ export function mountMapLab(root: HTMLElement): () => void {
     rotated: false,
     report: null as MapGenReport | null,
     ms: 0,
+    showOwners: false,
   };
 
   const camera = new MapCamera(board, svg, onTap, zoom => svg.classList.toggle('zoomed', zoom > 1.5));
@@ -48,9 +49,22 @@ export function mountMapLab(root: HTMLElement): () => void {
   function draw(refit: boolean): void {
     const map = state.report!.map;
     const rotate = board.clientHeight > board.clientWidth * 1.1;
+    // When showOwners is on, simulate random territory assignment for 4 players
+    let owners: number[] | undefined;
+    let colorMode: 'continent' | 'owner' = 'continent';
+    if (state.showOwners) {
+      colorMode = 'owner';
+      // Deterministic pseudo-random owner assignment based on seed
+      const seed = state.seed;
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) { hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0; }
+      let rng = Math.abs(hash) || 1;
+      const nextRng = () => { rng = (rng * 16807) % 2147483647; return (rng - 1) / 2147483646; };
+      owners = map.territories.map(() => Math.floor(nextRng() * 4));
+    }
     const box = renderMap(svg, map, {
-      // Ownership is dealt at game start, not at map generation, so the lab only shows geography.
-      colorMode: 'continent',
+      colorMode,
+      owners,
       rotate,
       continentLabels: true,
       selected: state.selected,
@@ -114,6 +128,13 @@ export function mountMapLab(root: HTMLElement): () => void {
     $('copy').textContent = 'COPIED ✓';
     setTimeout(() => { $('copy').textContent = 'COPY LINK'; }, 1200);
   };
+  // Owner simulation toggle
+  const ownerCheck = document.getElementById('show-owners') as HTMLInputElement;
+  ownerCheck.onchange = () => {
+    state.showOwners = ownerCheck.checked;
+    draw(false);
+  };
+
   const onKey = (e: KeyboardEvent) => { if (e.key === 'g' || e.key === ' ') { e.preventDefault(); generate(true); } };
   addEventListener('keydown', onKey);
   const resize = new ResizeObserver(() => { if (state.report) draw(false); });
@@ -150,6 +171,10 @@ const LAB_HTML = `
       </details>
       <div class="seed-row"><span class="lbl">SEED</span><code id="seed"></code><button id="copy" class="mini">COPY LINK</button></div>
       </div>
+      <label class="owner-toggle">
+        <input type="checkbox" id="show-owners">
+        <span class="lbl">SIMULATE OWNERS</span>
+      </label>
       <button class="primary" id="generate">⟳ GENERATE NEW MAP</button>
     </section>
   </div>

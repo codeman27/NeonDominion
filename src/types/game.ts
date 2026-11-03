@@ -28,7 +28,8 @@ export interface Continent {
 }
 
 /**
- * The only connections between continents. BRIDGE = a narrow strip of land hexes (already
+ * Narrow connections between landmasses, in addition to natural mainland borders.
+ * BRIDGE = a narrow strip of land hexes (already
  * included in territories a/b). SEA_LANE = a naval link drawn between two coastal hexes.
  */
 export interface Chokepoint {

@@ -43,6 +43,7 @@ export class MapCamera {
   }
 
   fit(): void {
+    cancelAnimationFrame(this.anim);
     this.view = { ...this.fitBox };
     this.apply();
   }

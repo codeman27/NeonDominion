@@ -1,4 +1,6 @@
 import { computeStateHash } from '../crypto/stateHash';
+import type { GameEvent } from '../types/protocol';
+import { roundOfTurn } from '../ui/rounds';
 import { replayEventLog } from './localTransport';
 
 export interface PlayerStats {
@@ -10,6 +12,7 @@ export interface PlayerStats {
   troopsLost: number;
   eliminated: number[];
   peakTerritories: number;
+  eliminatedRound: number | null;
 }
 
 export interface GameStats {
@@ -21,18 +24,22 @@ export interface GameStats {
 
 /** Game statistics derived purely from the text event log (so they survive save/resume). */
 export function computeGameStats(log: string): GameStats {
+  const events = JSON.parse(log) as GameEvent[];
   let players: PlayerStats[] = [];
   let turns = 0;
   const { state } = replayEventLog(log, (r, before) => {
     if (!players.length) {
       players = before.players.map((_, i) => ({
         turns: 0, attacks: 0, captures: 0, territoriesLost: 0, troopsKilled: 0, troopsLost: 0, eliminated: [],
-        peakTerritories: before.territories.filter(t => t.owner === i).length,
+        peakTerritories: before.territories.filter(t => t.owner === i).length, eliminatedRound: null,
       }));
     }
     turns++;
     const me = players[r.playerIndex];
     me.turns++;
+    for (const eliminated of r.eliminatedPlayers) {
+      players[eliminated].eliminatedRound = roundOfTurn(events, r.turnNumber, r.playerIndex);
+    }
     for (const l of r.attackLogs) {
       if (l.skippedReason || l.defenderIndex === null) continue;
       const them = players[l.defenderIndex];
@@ -51,7 +58,7 @@ export function computeGameStats(log: string): GameStats {
   if (!players.length) {
     players = state.players.map((_, i) => ({
       turns: 0, attacks: 0, captures: 0, territoriesLost: 0, troopsKilled: 0, troopsLost: 0, eliminated: [],
-      peakTerritories: state.territories.filter(t => t.owner === i).length,
+      peakTerritories: state.territories.filter(t => t.owner === i).length, eliminatedRound: null,
     }));
   }
   return { turns, winnerIndex: state.winnerIndex, finalStateHash: computeStateHash(state), players };

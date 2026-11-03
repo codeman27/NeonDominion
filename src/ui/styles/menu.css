@@ -42,5 +42,37 @@
 .menu .adv a { color: var(--cyan); }
 .menu .start { height: 60px; font-size: 18px; letter-spacing: .3em; border-radius: 16px; }
 .menu .continue { height: 48px; border-radius: 14px; border: 1px solid var(--cyan); background: rgba(7, 1, 15, .6); font: 700 12px var(--display); letter-spacing: .2em; color: var(--cyan); }
+.nostr-menu { overflow-y: auto; }
+.nostr-menu .m-card { margin-top: 0; flex: none; }
+.multiplayer-menu .m-card { margin-top: auto; }
+.nostr-menu h2 { font: 700 14px var(--display); color: var(--cyan); margin: 0; }
+.nostr-menu p { font-size: 12px; line-height: 1.5; margin: 6px 0; }
+.nostr-menu .continue { flex: none; width: 100%; font-size: 10px; letter-spacing: .1em; margin: 4px 0; }
+.nostr-menu .continue:disabled, .nostr-menu .continue[aria-disabled="true"] { opacity: 1; color: var(--dim); border-color: var(--dim); cursor: not-allowed; }
+.multiplayer-help { margin-bottom: 8px; }
+.multiplayer-help > summary { display: grid; place-items: center; width: 44px; height: 44px; margin-left: auto; border: 1px solid var(--line); border-radius: 50%; color: var(--cyan); cursor: pointer; list-style: none; font: 700 16px var(--display); }
+.multiplayer-help > summary::-webkit-details-marker { display: none; }
+.multiplayer-help > div { padding: 8px 0; }
+.nostr-menu #n-status:empty, .nostr-menu #n-resume-error:empty, .nostr-menu #n-account-summary:empty { display: none; }
+.nostr-game-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.nostr-game-actions .continue { height: auto; min-height: 48px; white-space: normal; overflow-wrap: anywhere; padding: 10px; }
+.saved-game { margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; overflow-wrap: anywhere; }
+.saved-game h3 { margin: 0; font: 700 11px var(--display); color: var(--cyan); }
+.nostr-menu .row { gap: 8px; }
+.nostr-menu input, .nostr-menu textarea { width: 100%; font: 16px var(--mono); color: var(--cyan); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; user-select: text; }
+.nostr-menu textarea { resize: vertical; overflow-wrap: anywhere; }
+.lobby-roster { padding-left: 20px; margin: 0; }
+.lobby-roster li { margin: 8px 0; overflow-wrap: anywhere; }
+.lobby-roster small { display: block; font-size: 10px; color: var(--dim); user-select: text; }
+.lobby-roster .continue { height: auto; min-height: 48px; white-space: normal; overflow-wrap: anywhere; padding: 10px; }
+.nostr-menu label { font-size: 10px; color: var(--dim); }
+.nostr-menu .nostr-notice { color: var(--sun); }
+.nostr-menu #n-status { overflow-wrap: anywhere; color: var(--cyan); }
+.nostr-menu #l-status, .nostr-menu #l-invite-details, .nostr-menu #l-connection { overflow-wrap: anywhere; }
+.multiplayer-setup-board { height: 38dvh; min-height: 220px; position: relative; border: 1px solid var(--line); border-radius: 12px; }
+.multiplayer-setup-board svg { width: 100%; height: 100%; display: block; }
+.setup-hash, #ms-complete, #ms-progress { overflow-wrap: anywhere; user-select: text; }
+#ms-inputs { display: grid; gap: 6px; }
+#ms-inputs label { margin-top: 6px; }
 
 @media (min-height: 860px) { .menu .m-prev { height: 220px; } .menu .title { font-size: 56px; } }

@@ -13,6 +13,7 @@ export function randomMapSeed(): string {
 
 export interface MenuOptions {
   onStart(settings: { playerCount: number; mapSeed: string }): void;
+  onNostr(): void;
   /** Present when a saved game exists. */
   onContinue?: () => void;
 }
@@ -52,18 +53,22 @@ export function mountMainMenu(root: HTMLElement, opts: MenuOptions): () => void 
     refresh();
   };
   q('#start').onclick = () => opts.onStart({ playerCount: state.players, mapSeed: state.seed });
+  q('#nostr').onclick = opts.onNostr;
 
   refresh();
   return () => { root.innerHTML = ''; };
 }
 
+export const MENU_BACKGROUND = '<div class="stars"></div><div class="sun"></div><div class="floor-wrap"><div class="floor"></div></div><div class="horizon"></div>';
+export const MENU_HEADING = '<header class="m-title"><div class="kicker">◢ HEX WARFARE ◣</div><h1 class="title">NEON<br>DOMINION</h1></header>';
+
 const MENU_HTML = `
 <div class="menu">
-  <div class="stars"></div><div class="sun"></div><div class="floor-wrap"><div class="floor"></div></div><div class="horizon"></div>
+  ${MENU_BACKGROUND}
   <div class="menu-col">
-    <header class="m-title"><div class="kicker">◢ HEX WARFARE ◣</div><h1 class="title">NEON<br>DOMINION</h1></header>
+    ${MENU_HEADING}
     <div class="m-card glass">
-      <div class="seg"><button class="active">SOLO</button><button disabled title="Coming in Phase 2">NOSTR 🔒</button></div>
+      <div class="seg"><button class="active">SOLO</button><button id="nostr">MULTIPLAYER</button></div>
       <div class="row"><span class="lbl">COMMANDERS</span>
         <div class="stepper"><button id="pc-minus" aria-label="Fewer commanders">−</button><b id="pc-val">4</b><button id="pc-plus" aria-label="More commanders">+</button></div></div>
       <div class="dots" id="pc-dots"></div>
@@ -74,7 +79,7 @@ const MENU_HTML = `
         <small>Same seed + same commander count = same map. Share it to replay. · <a href="?lab">Map Lab</a></small>
       </details>
     </div>
-    <button id="m-continue" class="continue" hidden>▶ CONTINUE GAME</button>
+    <button id="m-continue" class="continue" hidden>▶ CONTINUE SAVED GAME</button>
     <button id="start" class="primary start">START ▸</button>
   </div>
 </div>`;

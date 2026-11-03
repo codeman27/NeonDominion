@@ -3,16 +3,19 @@ import { connectedOwned } from '../../engine/fortify';
 import { bestSet, mustTrade } from '../../engine/rules';
 import { computeReinforcements, validateTurnPlan } from '../../engine/turnEngine';
 import type { TurnOutcome } from '../../transport/transport';
-import type { LocalGame } from '../../transport/localTransport';
-import type { AttackCampaignOrder, CardTradeOrder, FortifyOrder, OccupyMode, TurnActionPlan } from '../../types/actions';
+import { replayEventLog, type LocalGame } from '../../transport/localTransport';
+import type { AttackCampaignOrder, CardTradeOrder, FortifyOrder, OccupyMode, TurnActionPlan, TurnResolutionResult, InteractiveTurnState, InteractiveAttackResult } from '../../types/actions';
 import type { GameState, TerritoryCard, TerritoryId } from '../../types/game';
 import { buildReplay, type ReplayFrame } from '../components/battleReplay';
+import { battleResultsHtml } from '../components/battleResults';
 import { openEventInspector, showVictory } from '../components/eventInspector';
 import { renderMap, territoryPoint, type MapArrow } from '../components/hexMapRenderer';
 import { MapCamera } from '../components/mapCamera';
 import { NEON } from '../theme';
+import { roundOfTurn } from '../rounds';
+import { attackConfirmationHtml, commanderBadgesHtml, commanderRosterHtml, continentIntelHtml, deploymentPhaseHtml, draftPhaseHtml, fortifyPhaseHtml, gameOverPhaseHtml, movementPhaseHtml, placementChipsHtml, territoryPillHtml } from '../components/gamePhaseUi';
 
-type Phase = 'setup' | 'draft' | 'attack' | 'fortify' | 'commit' | 'waiting' | 'replay' | 'over';
+type Phase = 'setup' | 'draft' | 'attack' | 'move' | 'fortify' | 'commit' | 'waiting' | 'replay' | 'over' | 'interactive_attack';
 /** Base duration of one replay beat at 1× speed. */
 const BEAT_MS = 650;
 const PLAN_PHASES = ['draft', 'attack', 'fortify', 'commit'] as const;
@@ -29,6 +32,16 @@ export interface GameScreenOptions {
 
 interface PlannedAttack extends AttackCampaignOrder { chain: boolean }
 
+/** The resolver counts all source troops, including the one that cannot attack. */
+export function attackStopThreshold(remainingAttackers: number | null): number {
+  return remainingAttackers == null ? 0 : remainingAttackers + 1;
+}
+
+/** Cards that pending trades refer to; the pre-trade snapshot is only valid during the interactive turn it was taken for. */
+export function tradeHand(interactive: boolean, snapshot: TerritoryCard[] | null, liveHand: TerritoryCard[]): TerritoryCard[] {
+  return interactive && snapshot ? snapshot : liveHand;
+}
+
 /** Game board + phase sheet (steps 1.15–1.16). Returns an unmount function. */
 export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameScreenOptions): () => void {
   root.innerHTML = GAME_HTML;
@@ -40,6 +53,7 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
   const S = (): GameState => game.getState();
   const tn = (id: TerritoryId) => map.territories[id].name;
   const color = (p: number) => NEON.players[p % NEON.players.length];
+  const roundOf = (turnNumber: number, playerIndex: number) => roundOfTurn(game.getEvents(), turnNumber, playerIndex);
 
   const ui = {
     phase: 'setup' as Phase,
@@ -61,17 +75,38 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     skip: false,
     sealing: false,
     wake: null as (() => void) | null,
+    /** Interactive attack state: tracks the live GameState during the turn. */
+    interactive: null as { state: InteractiveTurnState; lastResult: InteractiveAttackResult | null } | null,
+    /** Move step state during interactive attack. */
+    move: null as { from: TerritoryId; to: TerritoryId; troops: number; minMove: number } | null,
+    /** Pending attack being configured during commit phase. */
+    pendingAttack: null as { from: TerritoryId; to: TerritoryId; troops: number } | null,
+    /** Stop at this many remaining attacking armies, excluding the reserved army (null = no limit). */
+    stopAtTroops: null as number | null,
+    /** Snapshot of player's hand at commit time (before trades remove cards). */
+    handSnapshot: null as TerritoryCard[] | null,
+    /** Whether the post-attack BATTLE RESULTS breakdown is expanded (collapsed by default). */
+    battleResultsOpen: false,
   };
 
   const camera = new MapCamera(board, svg, onTap, z => svg.classList.toggle('zoomed', z > 1.5));
-  const offTurn = game.onTurnResolved(o => { ui.log.unshift(...describe(o)); ui.log.length = Math.min(ui.log.length, 60); });
+  // Battle log: rebuilt from the text event log (so it survives resume), then kept live.
+  replayEventLog(game.exportEventLog(), r => { ui.log.unshift(...describe(r)); });
+  ui.log.length = Math.min(ui.log.length, 60);
+  const offTurn = game.onTurnResolved(o => { ui.log.unshift(...describe(o.resolution)); ui.log.length = Math.min(ui.log.length, 60); });
 
   /* ------------------------------ derived values ------------------------------ */
-  const owns = (id: TerritoryId) => S().territories[id].owner === me;
+  const owns = (id: TerritoryId) => {
+    if (ui.interactive) return ui.interactive.state.liveState.territories[id].owner === me;
+    return S().territories[id].owner === me;
+  };
   const sum = (m: Map<TerritoryId, number>) => [...m.values()].reduce((a, b) => a + b, 0);
   const hand = (): TerritoryCard[] => S().players[me].cards;
   const tradedIds = () => new Set(ui.trades.flatMap(t => t.cardIds));
-  const tradeCards = () => ui.trades.map(t => t.cardIds.map(id => hand().find(c => c.id === id)!));
+  const tradeCards = () => {
+    const cards = tradeHand(ui.interactive !== null, ui.handSnapshot, hand());
+    return ui.trades.map(t => t.cardIds.map(id => cards.find(c => c.id === id)!));
+  };
   const reinf = () => computeReinforcements(map, S(), me, tradeCards());
   const setupLeft = () => S().players[me].setupTroops - sum(ui.setup);
   const draftLeft = () => reinf().total - sum(ui.draft);
@@ -89,13 +124,44 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     return t;
   }
 
+  /** Get troop count for a territory, considering the live interactive state. */
+  function getScaledTroops(id: TerritoryId): number {
+    if (ui.interactive) {
+      return ui.interactive.state.liveState.territories[id].troops;
+    }
+    return projectedTroops()[id];
+  }
+
   function validTargets(): Set<TerritoryId> | null {
     if (ui.sel === null) return null;
+    if ((ui.phase === 'attack' || ui.phase === 'commit' || ui.phase === 'interactive_attack') && ui.interactive) {
+      // In interactive attack mode: highlight only enemy territories (attackable)
+      const selId = ui.sel;
+      const neighbors = map.territories[selId].neighbors;
+      const targets = new Set<TerritoryId>();
+      for (const n of neighbors) {
+        const liveTerr = ui.interactive.state.liveState.territories[n];
+        const liveOwner = liveTerr?.owner;
+        const isOwned = liveOwner === me;
+        if (!isOwned) targets.add(n);
+      }
+      // Debug: log territory states for troubleshooting
+      const info = neighbors.map(n => {
+        const t = map.territories[n];
+        const lt = ui.interactive!.state.liveState.territories[n];
+        return `${t.name}(id=${n},liveOwner=${lt?.owner},me=${me},enemy=${lt?.owner !== me})`;
+      }).join(' | ');
+      console.log(`[validTargets] sel=${selId}(${map.territories[selId].name},owner=${S().territories[selId].owner}) phase=${ui.phase} interactive=${!!ui.interactive} neighbors=[${info}] targets=[${[...targets].map(id => map.territories[id].name).join(',')}]`);
+      return targets;
+    }
     if (ui.phase === 'attack') {
       const taken = pendingCaptures();
       return new Set(map.territories[ui.sel].neighbors.filter(n => !owns(n) && !taken.has(n)));
     }
-    if (ui.phase === 'fortify') return connectedOwned(map, S(), me, ui.sel);
+    if (ui.phase === 'fortify') {
+      const live = ui.interactive ? ui.interactive.state.liveState : S();
+      return connectedOwned(map, live, me, ui.sel);
+    }
     return null;
   }
 
@@ -110,18 +176,59 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
 
   /* ------------------------------ rendering ------------------------------ */
   function draw(refit = false): void {
-    const portrait = board.clientHeight > board.clientWidth * 1.1;
+    // Panel height changes must not rotate the map between phases.
+    const viewport = q('.game');
+    const portrait = viewport.clientHeight > viewport.clientWidth * 1.1;
     const f = ui.frame;
-    let arrows: MapArrow[] = ui.attacks.map((a, i) => ({ from: a.fromTerritoryId, to: a.toTerritoryId, kind: 'attack', label: String(i + 1) }));
-    if (ui.fortify) arrows.push({ from: ui.fortify.fromTerritoryId, to: ui.fortify.toTerritoryId, kind: 'fortify', label: 'F' });
+    let arrows: MapArrow[] = [];
+    if (ui.phase === 'attack') {
+      arrows = ui.attacks.map((a, i) => ({ from: a.fromTerritoryId, to: a.toTerritoryId, kind: 'attack', label: String(i + 1) }));
+    } else if (ui.phase === 'commit' && ui.interactive) {
+      // Show pending attack during commit phase
+      if (ui.pendingAttack) {
+        arrows.push({ from: ui.pendingAttack.from, to: ui.pendingAttack.to, kind: 'attack', label: '!' });
+      }
+    } else if (ui.phase === 'move' && ui.move) {
+      arrows.push({ from: ui.move.from, to: ui.move.to, kind: 'attack', label: 'M' });
+    } else if (ui.pendingAttack) {
+      arrows.push({ from: ui.pendingAttack.from, to: ui.pendingAttack.to, kind: 'attack', label: '!' });
+    } else if (ui.fortify) {
+      arrows.push({ from: ui.fortify.fromTerritoryId, to: ui.fortify.toTerritoryId, kind: 'fortify', label: 'F' });
+    }
     let boosted = new Set([...(ui.phase === 'setup' ? ui.setup.keys() : ui.draft.keys())]);
     if (f) { arrows = f.arrow ? [f.arrow] : []; boosted = new Set(f.boosted ?? []); }
+    // During interactive attack, show user's attackable territories (≥2 troops) as subtle highlights
+    let myTerritories: Set<TerritoryId> | null = null;
+    if (ui.phase === 'interactive_attack' && ui.interactive && ui.sel === null) {
+      myTerritories = new Set();
+      const liveTerrs = ui.interactive.state.liveState.territories;
+      for (let i = 0; i < liveTerrs.length; i++) {
+        const t = liveTerrs[i];
+        if (t.owner === me && t.troops >= 2) myTerritories.add(i);
+      }
+    }
     const box = renderMap(svg, map, {
-      colorMode: 'owner', owners: f ? f.owners : S().territories.map(t => t.owner), troops: f ? f.troops : projectedTroops(), rotate: portrait,
+      colorMode: 'owner',
+      owners: f ? f.owners : (ui.interactive ? ui.interactive.state.liveState.territories.map(t => t.owner) : S().territories.map(t => t.owner)),
+      troops: f ? f.troops : (ui.interactive ? ui.interactive.state.liveState.territories.map(t => t.troops) : projectedTroops()),
+      rotate: portrait,
       selected: f ? null : ui.sel, highlight: f ? null : validTargets(), boosted, arrows,
+      debugSel: ui.sel, myTerritories,
     });
     camera.setFitBox(box, refit || portrait !== ui.rotated);
     ui.rotated = portrait;
+
+    // Debug overlay for valid targets
+    const dbg = q('#debug-overlay');
+    if (ui.sel && (ui.phase === 'interactive_attack' || ui.phase === 'attack')) {
+      const neighbors = map.territories[ui.sel].neighbors;
+      const targets = validTargets();
+      dbg.hidden = false;
+      dbg.textContent = `SEL: ${map.territories[ui.sel].name}(${ui.sel})\nNEIGHBORS: ${neighbors.map(n => `${map.territories[n].name}(${n})`).join(', ')}\nTARGETS: ${targets ? [...targets].map(t => map.territories[t].name).join(', ') : 'none'}\nPHASE: ${ui.phase}\nme: ${me}`;
+    } else {
+      dbg.hidden = true;
+    }
+
     renderTop();
     renderSheet();
     renderDrawer();
@@ -130,36 +237,33 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
   function renderTop(): void {
     const s = S();
     const replaying = ui.phase === 'replay' && ui.frame;
-    const turn = replaying ? ui.replayTurn : s.turnNumber;
+    const turn = replaying ? roundOf(ui.replayTurn, ui.replayWho) : s.turnNumber ? roundOf(s.turnNumber, s.activePlayerIndex) : 0;
     const active = replaying ? ui.replayWho : s.phase === 'ACTIVE_TURN_COMMIT' ? s.activePlayerIndex : -1;
     const owners = ui.frame ? ui.frame.owners : s.territories.map(t => t.owner);
     q('#turn').textContent = turn ? String(turn).padStart(2, '0') : '—';
-    q('#players').innerHTML = s.players.map((p, i) => {
-      const n = owners.filter(o => o === i).length;
-      return `<span class="${i === active ? 'active' : ''} ${p.eliminated && !n ? 'out' : ''}" style="--pc:${color(i)}" title="${p.name}">${n}</span>`;
-    }).join('');
+    q('#players').innerHTML = commanderBadgesHtml({ ...s, territories: s.territories.map((t, i) => ({ ...t, owner: owners[i] })) }, active);
     const phases = q('#phases');
-    phases.hidden = !PLAN_PHASES.includes(ui.phase as typeof PLAN_PHASES[number]);
+    const isInteractive = ui.phase === 'interactive_attack' || ui.phase === 'move' || ui.phase === 'attack' || (ui.phase === 'commit' && ui.interactive);
+    phases.hidden = !PLAN_PHASES.includes(ui.phase as typeof PLAN_PHASES[number]) && !isInteractive;
     const idx = PLAN_PHASES.indexOf(ui.phase as typeof PLAN_PHASES[number]);
-    phases.querySelectorAll('button').forEach((b, i) => { b.classList.toggle('active', i === idx); b.classList.toggle('done', i < idx); });
+    if (isInteractive) {
+      // Hide phase bar during interactive mode — all controls are in the sheet
+      phases.hidden = true;
+    } else {
+      const idx2 = PLAN_PHASES.indexOf(ui.phase as typeof PLAN_PHASES[number]);
+      phases.querySelectorAll('button').forEach((b, i) => { b.classList.toggle('active', i === idx2); b.classList.toggle('done', i < idx2); });
+    }
     q('#badge-draft').textContent = idx >= 0 && draftLeft() ? String(draftLeft()) : '';
     q('#badge-attack').textContent = ui.attacks.length ? String(ui.attacks.length) : '';
   }
 
-  const stepToggle = () => `<div class="step-toggle">${[1, 5].map(n => `<button data-step="${n}" class="${ui.step === n ? 'on' : ''}">×${n}</button>`).join('')}<button data-step="999" class="${ui.step === 999 ? 'on' : ''}">ALL</button></div>`;
-
   function renderSheet(): void {
     const sheet = q('#sheet');
     const s = S();
-    const next = (p: Phase, label: string, disabled = false) => `<button class="primary btn" data-go="${p}" ${disabled ? 'disabled' : ''}>${label} ▸</button>`;
     const back = (p: Phase) => `<button class="btn ghost" data-go="${p}">◂</button>`;
 
     if (ui.phase === 'setup') {
-      const chips = [...ui.setup].map(([id, n]) => `<span>${tn(id)}<b>+${n}</b></span>`).join('') || '<span class="empty">Tap your territories to place troops</span>';
-      sheet.innerHTML = `
-        <div class="big"><span class="n">${setupLeft()}</span><span class="t">STARTING TROOPS<small>Fortify your borders before turn 1</small></span>${stepToggle()}</div>
-        <div class="chips">${chips}</div>
-        <div class="actions"><button class="btn ghost" id="undo">UNDO</button><button class="primary btn" id="deploy" ${setupLeft() ? 'disabled' : ''}>DEPLOY ▸</button></div>`;
+      sheet.innerHTML = deploymentPhaseHtml(setupLeft(), ui.step, placementChipsHtml(ui.setup, tn));
       q('#undo').onclick = () => { ui.setup.clear(); draw(); };
       q('#deploy').onclick = deploy;
     } else if (ui.phase === 'draft') {
@@ -167,18 +271,74 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
       const traded = tradedIds();
       const remaining = hand().filter(c => !traded.has(c.id));
       const set = bestSet(remaining);
-      const cards = hand().map(c => `<span class="card ${c.emblem} ${traded.has(c.id) ? 'traded' : ''}" title="${c.territoryId === null ? 'WILD' : tn(c.territoryId)}">${c.emblem.slice(0, 3)}</span>`).join('');
-      const chips = [...ui.draft].map(([id, n]) => `<span>${tn(id)}<b>+${n}</b></span>`).join('') || '<span class="empty">Tap your territories to place troops</span>';
       const parts = [`${r.base} base`, r.continentBonus ? `${r.continentBonus} continents` : '', r.cardTradeBonus ? `${r.cardTradeBonus} cards` : ''].filter(Boolean).join(' + ');
-      sheet.innerHTML = `
-        <div class="big"><span class="n">${draftLeft()}</span><span class="t">TROOPS TO PLACE<small>${parts}${r.matchTerritories.length ? ` · +2 on ${r.matchTerritories.map(tn).join(', ')}` : ''}</small></span>${stepToggle()}</div>
-        ${hand().length ? `<div class="hand">${cards}<button class="chip-btn" id="trade" ${set ? '' : 'disabled'}>${set ? `TRADE +${set.value}` : 'NO SET'}</button></div>` : ''}
-        ${tradeRequired() ? '<div class="hint warn">5+ cards: you must trade a set before continuing.</div>' : ''}
-        <div class="chips">${chips}</div>
-        <div class="actions"><button class="btn ghost" id="undo">UNDO</button>${next('attack', 'ATTACK', draftLeft() !== 0 || tradeRequired())}</div>`;
+      sheet.innerHTML = draftPhaseHtml({
+        left: draftLeft(), step: ui.step, parts: parts + (r.matchTerritories.length ? ` · +2 on ${r.matchTerritories.map(tn).join(', ')}` : ''),
+        cards: hand(), traded, required: tradeRequired(), chips: placementChipsHtml(ui.draft, tn), territoryName: tn,
+      });
       q('#undo').onclick = () => { ui.draft.clear(); ui.trades = []; draw(); };
+      q('#start-atk').onclick = commitTurn;
       if (set) q('#trade').onclick = () => { ui.trades.push({ cardIds: set.cardIds }); draw(); toast(`Traded a set for +${set.value} troops`); };
     } else if (ui.phase === 'attack') {
+      // In interactive mode, render the interactive attack sheet
+      if (ui.interactive) {
+        const interactive = ui.interactive;
+        const hasMore = interactive.lastResult?.moreAttacks;
+        const hasAttacks = interactive.state.remainingAttacks.length > 0;
+        const diceHtml = interactive.lastResult
+          ? (() => {
+              const w = interactive.lastResult.attack.waves;
+              if (!w?.length) return '';
+              const lastWave = w[w.length - 1];
+              const pairs = Math.min(lastWave.attackerDice.length, lastWave.defenderDice.length);
+              const attDice = lastWave.attackerDice.map((v, i) => `<span class="die a ${i < pairs && v > lastWave.defenderDice[i] ? 'won' : ''}">${v}</span>`).join('');
+              const defDice = lastWave.defenderDice.map((v, i) => `<span class="die d ${i < pairs && v >= lastWave.attackerDice[i] ? 'won' : ''}">${v}</span>`).join('');
+              return `<div class="rp-dice"><div>${attDice}</div><span class="vs">vs</span><div>${defDice}</div></div>`;
+            })()
+          : '';
+        const attackDesc = interactive.lastResult
+          ? (() => {
+              const a = interactive.lastResult.attack;
+              const conquered = a.conquered ? ' ★ conquered!' : '';
+              return `${tn(a.fromTerritoryId)} → ${tn(a.toTerritoryId)}${conquered}`;
+            })()
+          : '';
+        if (ui.pendingAttack) {
+          const { from, to } = ui.pendingAttack;
+          const sourceTroops = getScaledTroops(from);
+          const maxTroops = Math.max(0, sourceTroops - 1);
+          const troops = ui.move?.troops ?? sourceTroops;
+          const actualTroops = Math.min(troops, maxTroops);
+          sheet.innerHTML = `
+            <div class="big"><span class="n">${actualTroops}</span><span class="t">ARMIES<small>${tn(from)} → ${tn(to)} (max ${maxTroops})</small></span><div class="step-toggle">${[1, 5].map(n => `<button data-step="${n}" class="${ui.step === n ? 'on' : ''}">×${n}</button>`).join('')}<button data-step="999" class="${ui.step === 999 ? 'on' : ''}">ALL</button></div></div>
+            <div class="actions"><button class="btn" id="atk-cancel">CANCEL</button><button class="primary btn" id="atk-confirm">CONFIRM ATTACK</button></div>`;
+          q('#atk-cancel').onclick = () => { ui.pendingAttack = null; ui.sel = null; draw(); };
+          q('#atk-confirm').onclick = async () => { await onConfirmAttack(); };
+        } else {
+          // Show last attack result at the top of the attack sheet
+          let resultHtml = '';
+          if (interactive.lastResult) {
+            const a = interactive.lastResult.attack;
+            const w = a.waves?.[a.waves.length - 1];
+            const pairs = w ? Math.min(w.attackerDice.length, w.defenderDice.length) : 0;
+            const attDice = (w?.attackerDice || []).map((v, i) => `<span class="die a ${i < pairs && v > w.defenderDice[i] ? 'won' : ''}">${v}</span>`).join('');
+            const defDice = (w?.defenderDice || []).map((v, i) => `<span class="die d ${i < pairs && v >= w.attackerDice[i] ? 'won' : ''}">${v}</span>`).join('');
+            const conquered = a.conquered ? ' ★ conquered!' : '';
+            const diceRow = w ? `<div class="rp-dice"><div>${attDice}</div><span class="vs">vs</span><div>${defDice}</div></div>` : '';
+            resultHtml = `<div class="last-result"><div class="result-line">${tn(a.fromTerritoryId)} → ${tn(a.toTerritoryId)} <b>${conquered}</b></div>${diceRow}</div>`;
+          }
+          sheet.innerHTML = `
+            ${resultHtml}
+            <div class="summary"><div><b>${interactive.state.remainingAttacks.length}</b><small>REMAINING</small></div></div>
+            <div class="rp-cap ${interactive.lastResult?.attack.conquered ? 'won' : 'neutral'}">${attackDesc || 'Select a target to attack'}</div>${diceHtml}
+            <div class="actions">${hasMore ? '<button class="primary btn" id="atk-next">ATTACK ▸</button>' : ''}${hasMore || hasAttacks ? back('attack') : ''}<button class="btn" id="fortify-now">FORTIFY ▸▸</button></div>`;
+          const atkBtn = q('#atk-next');
+          if (atkBtn) atkBtn.onclick = onAttackNext;
+          const fortBtn = q('#fortify-now');
+          if (fortBtn) fortBtn.onclick = onFortifyNow;
+        }
+        return;
+      }
       const rows = ui.attacks.map((a, i) => `
         <div class="atk-item ${a.chain ? 'chain' : ''}"><span class="no">${i + 1}</span>
           <span class="p">${a.chain ? '↳ ' : ''}${tn(a.fromTerritoryId)}<em>→</em>${tn(a.toTerritoryId)}</span>
@@ -188,7 +348,8 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
       sheet.innerHTML = `
         <div class="hint">${ui.sel === null ? 'Tap <b>your territory</b>, then a <b>pulsing enemy</b>. Captured targets can attack again (chain).' : `From <b>${tn(ui.sel)}</b>: tap a pulsing target`}</div>
         <div class="atk-list">${rows || '<div class="note">No attacks queued. Dice are rolled only after you commit.</div>'}</div>
-        <div class="actions">${back('draft')}${next('fortify', 'FORTIFY')}</div>`;
+        <div class="actions"><button class="primary btn" id="start-interactive">ATTACK</button></div>`;
+      q('#start-interactive').onclick = commitTurn;
       sheet.querySelectorAll<HTMLElement>('[data-stop]').forEach(b => b.onclick = () => {
         const a = ui.attacks[Number(b.dataset.stop)];
         a.stopWhenAttackerAtOrBelow = STOPS[(STOPS.indexOf(a.stopWhenAttackerAtOrBelow) + 1) % STOPS.length];
@@ -202,23 +363,77 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
       sheet.querySelectorAll<HTMLElement>('[data-rm]').forEach(b => b.onclick = () => { removeAttack(Number(b.dataset.rm)); draw(); });
     } else if (ui.phase === 'fortify') {
       const f = ui.fortify;
-      const max = f ? projectedTroops()[f.fromTerritoryId] - 1 : 0;
-      sheet.innerHTML = `
-        <div class="hint">${ui.sel === null ? 'Optional: tap a <b>source</b>, then any <b>connected</b> territory of yours. Runs after your attacks.' : `From <b>${tn(ui.sel)}</b>: tap a pulsing destination`}</div>
-        ${f ? `<div class="fort">${tn(f.fromTerritoryId)}<em>⇢</em>${tn(f.toTerritoryId)}<div class="stepper"><button id="f-m">−</button><b>${f.troops}</b><button id="f-p">+</button></div></div>` : '<div class="note">One move per turn. Skip if your lines are fine.</div>'}
-        <div class="actions">${back('attack')}${f ? '<button class="btn" id="f-clear">CLEAR</button>' : ''}${next('commit', 'REVIEW')}</div>`;
+      const inInteractive = !!ui.interactive;
+      const max = f ? (inInteractive ? getScaledTroops(f.fromTerritoryId) : projectedTroops()[f.fromTerritoryId]) - 1 : 0;
+      sheet.innerHTML = fortifyPhaseHtml({
+        hint: ui.sel === null ? `Optional: tap a source, then any connected territory of yours.${inInteractive ? ' Then END TURN.' : ''}` : `From ${tn(ui.sel)}: tap a pulsing destination`,
+        move: f ? { from: tn(f.fromTerritoryId), to: tn(f.toTerritoryId), troops: f.troops } : undefined,
+        interactive: inInteractive,
+      });
       if (f) {
         q('#f-m').onclick = () => { f.troops = Math.max(1, f.troops - 1); renderSheet(); };
         q('#f-p').onclick = () => { f.troops = Math.min(max, f.troops + 1); renderSheet(); };
+        q('#f-max').onclick = () => { f.troops = max; renderSheet(); };
         q('#f-clear').onclick = () => { ui.fortify = null; draw(); };
       }
-    } else if (ui.phase === 'commit') {
+      const backBtn = q('#fortify-back');
+      if (backBtn) backBtn.onclick = () => { ui.phase = 'commit'; ui.sel = null; draw(); };
+      if (inInteractive) {
+        q('#fortify-finish').onclick = () => { onCompleteAttack(); };
+      }
+    } else if (ui.phase === 'commit' && !ui.interactive) {
       const errors = validateTurnPlan(map, s, buildPlan());
       sheet.innerHTML = `
         <div class="summary"><div><b>${sum(ui.draft)}</b><small>PLACED</small></div><div><b>${ui.attacks.length}</b><small>ATTACKS</small></div><div><b>${ui.fortify ? 1 : 0}</b><small>FORTIFY</small></div></div>
         <div class="note">${errors.length ? `<span style="color:var(--sun)">${errors[0]}</span>` : 'Your whole turn gets signed and locked. Dice stay sealed until the next commander reveals their seed.'}</div>
         <div class="actions">${back('fortify')}<button class="primary btn" id="commit" ${errors.length ? 'disabled' : ''}>COMMIT TURN</button></div>`;
       q('#commit').onclick = commitTurn;
+    } else if (ui.phase === 'commit' || ui.phase === 'interactive_attack') {
+      const interactive = ui.interactive;
+      const hasMore = interactive ? interactive.lastResult?.moreAttacks : false;
+
+      // Pending attack: show troop slider and CONFIRM
+      if (ui.pendingAttack) {
+        const { from, to } = ui.pendingAttack;
+        const sourceTroops = getScaledTroops(from);
+        const maxTroops = Math.max(0, sourceTroops - 1);
+        const troops = ui.move?.troops ?? sourceTroops;
+        const actualTroops = Math.min(troops, maxTroops);
+        sheet.innerHTML = `
+          <div class="big"><span class="n">${actualTroops}</span><span class="t">ARMIES<small>${tn(from)} → ${tn(to)} (max ${maxTroops})</small></span><div class="step-toggle">${[1, 5].map(n => `<button data-step="${n}" class="${ui.step === n ? 'on' : ''}">×${n}</button>`).join('')}<button data-step="999" class="${ui.step === 999 ? 'on' : ''}">ALL</button></div></div>
+          <div class="actions"><button class="btn" id="atk-cancel">CANCEL</button><button class="primary btn" id="atk-confirm">CONFIRM ATTACK</button></div>`;
+        q('#atk-cancel').onclick = () => { ui.pendingAttack = null; ui.sel = null; draw(); };
+        q('#atk-confirm').onclick = async () => { await onConfirmAttack(); };
+      } else {
+        // Attack result or selection state
+        const promptText = ui.sel ? (ui.pendingAttack ? 'Set troop count below' : 'Tap adjacent enemy to attack') : 'TAP YOUR TERRITORY';
+        const isInitialAttack = interactive && !interactive.lastResult;
+
+        // Build attack history log from previous results
+        let historyHtml = '';
+        if (interactive && interactive.lastResult && interactive.lastResult.attack.conquered) {
+          const a = interactive.lastResult.attack;
+          const w = a.waves?.[a.waves.length - 1];
+          const pairs = w ? Math.min(w.attackerDice.length, w.defenderDice.length) : 0;
+          const attDice = (w?.attackerDice || []).map((v, i) => `<span class="die a ${i < pairs && v > w.defenderDice[i] ? 'won' : ''}">${v}</span>`).join('');
+          const defDice = (w?.defenderDice || []).map((v, i) => `<span class="die d ${i < pairs && v >= w.attackerDice[i] ? 'won' : ''}">${v}</span>`).join('');
+          const diceRow = w ? `<div class="rp-dice small"><div>${attDice}</div><span class="vs">vs</span><div>${defDice}</div></div>` : '';
+          historyHtml = `<div class="atk-history">${diceRow}<div class="atk-result">${tn(a.fromTerritoryId)} → ${tn(a.toTerritoryId)} <b>★ conquered!</b></div></div>`;
+        }
+
+        sheet.innerHTML = `
+          <div class="summary"><div><b>${interactive ? (interactive.lastResult ? interactive.state.remainingAttacks.length : ui.attacks.length) : 0}</b><small>REMAINING</small></div></div>
+          <div class="rp-cap">${promptText}</div>
+          <div class="actions">${isInitialAttack ? '<div class="hint-text">Tap your territory, then tap an adjacent enemy to attack</div>' : ''}${hasMore ? '<button class="primary btn" id="atk-next">ATTACK ▸</button>' : ''}${!isInitialAttack ? '<button class="btn" id="atk-continue">ATTACK ▸</button>' : ''}${!isInitialAttack ? '<button class="btn" id="fortify-now">FORTIFY ▸▸</button>' : ''}</div>
+          ${historyHtml ? `<div class="atk-log"><small>LAST RESULT</small>${historyHtml}</div>` : ''}
+          ${interactive?.lastResult ? battleResultsHtml(interactive.lastResult.attack, tn, ui.battleResultsOpen) : ''}`;
+        const atkBtn = q('#atk-next');
+        if (atkBtn) atkBtn.onclick = onAttackNext;
+        const fortBtn = q('#fortify-now');
+        if (fortBtn) fortBtn.onclick = onFortifyNow;
+        const contBtn = q('#atk-continue');
+        if (contBtn) contBtn.onclick = () => { ui.sel = null; ui.pendingAttack = null; draw(); };
+      }
     } else if (ui.phase === 'replay' && ui.frame) {
       const f = ui.frame;
       const dice = f.dice ? (() => {
@@ -230,7 +445,7 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
         return `<div class="rp-dice"><div>${f.dice.attacker.map((v, i) => die(v, i, 'a')).join('')}</div><span class="vs">vs</span><div>${f.dice.defender.map((v, i) => die(v, i, 'd')).join('')}</div></div>`;
       })() : '';
       sheet.innerHTML = `
-        <div class="rp-head" style="--pc:${color(ui.replayWho)}"><span class="sw"></span><b>${s.players[ui.replayWho].name}</b><small>TURN ${ui.replayTurn}</small>
+        <div class="rp-head" style="--pc:${color(ui.replayWho)}"><span class="sw"></span><b>${s.players[ui.replayWho].name}</b><small>TURN ${roundOf(ui.replayTurn, ui.replayWho)}</small>
           <div class="rp-ctl">${[1, 2].map(n => `<button data-speed="${n}" class="${ui.speed === n ? 'on' : ''}">${n}×</button>`).join('')}<button id="rp-skip">SKIP ▸▸</button></div></div>
         <div class="rp-cap ${f.tone ?? ''}">${f.caption}</div>${dice}
         <div class="rp-sub">${f.sub ?? ''}</div>`;
@@ -238,46 +453,95 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
       sheet.querySelectorAll<HTMLElement>('[data-speed]').forEach(b => b.onclick = () => {
         ui.speed = Number(b.dataset.speed); localStorage.setItem('nd.speed', String(ui.speed)); renderSheet();
       });
+    } else if (ui.phase === 'move' && ui.pendingAttack) {
+      // Attack troop count selection
+      const p = ui.pendingAttack;
+      const sourceTroops = getScaledTroops(p.from);
+      const maxTroops = Math.max(0, sourceTroops - 1);
+      const troops = ui.move?.troops ?? sourceTroops;
+      const actualTroops = Math.min(troops, maxTroops);
+      const maxStop = Math.max(1, actualTroops - 1);
+      if (ui.stopAtTroops != null) ui.stopAtTroops = Math.max(1, Math.min(maxStop, ui.stopAtTroops));
+      const stopDisabled = actualTroops <= 1;
+      sheet.innerHTML = attackConfirmationHtml(actualTroops, maxTroops, `${tn(p.from)} → ${tn(p.to)}`, stopDisabled ? null : ui.stopAtTroops);
+      q('#atk-cancel').onclick = () => { ui.pendingAttack = null; ui.sel = null; ui.phase = 'commit'; draw(); };
+      q('#atk-confirm').onclick = async () => { await onConfirmAttack(); };
+      if (!stopDisabled) {
+        const input = q<HTMLInputElement>('#atk-stop-input');
+        const readStop = () => Math.max(1, Math.min(maxStop, Math.floor(Number(input.value)) || 1));
+        const setStop = (value: number | null) => {
+          ui.stopAtTroops = value;
+          if (value != null && input.valueAsNumber !== value) input.value = String(value);
+          q('#atk-stop-toggle').setAttribute('aria-pressed', String(value != null));
+          q<HTMLButtonElement>('#atk-stop-off').disabled = value == null;
+        };
+        q('#atk-stop-toggle').onclick = () => setStop(readStop());
+        q('#atk-stop-off').onclick = () => setStop(null);
+        q('#atk-stop-minus').onclick = () => setStop(Math.max(1, (ui.stopAtTroops ?? maxStop) - 1));
+        q('#atk-stop-plus').onclick = () => setStop(Math.min(maxStop, (ui.stopAtTroops ?? maxStop) + 1));
+        input.oninput = () => {
+          if (!Number.isInteger(input.valueAsNumber) || input.valueAsNumber < 1 || input.valueAsNumber > maxStop) return;
+          setStop(input.valueAsNumber);
+        };
+        input.onchange = () => setStop(readStop());
+      }
+    } else if (ui.phase === 'move' && ui.move) {
+      // Post-conquest troop movement
+      const m = ui.move;
+      const fromTroops = getScaledTroops(m.from);
+      const minMove = m.minMove;
+      const maxMove = Math.max(0, fromTroops - 1);
+      const actualTroops = Math.min(m.troops, maxMove);
+      sheet.innerHTML = movementPhaseHtml(actualTroops, minMove, maxMove, `${tn(m.from)} → ${tn(m.to)}`,
+        ui.interactive?.lastResult ? battleResultsHtml(ui.interactive.lastResult.attack, tn, ui.battleResultsOpen) : '');
+      q('#move-minus').onclick = () => { ui.move!.troops = Math.max(minMove, ui.move!.troops - 1); renderSheet(); };
+      q('#move-plus').onclick = () => { ui.move!.troops = Math.min(maxMove, ui.move!.troops + 1); renderSheet(); };
+      q('#move-input').oninput = () => { ui.move!.troops = Math.max(minMove, Math.min(maxMove, Number(q<HTMLInputElement>('#move-input').value) || minMove)); renderSheet(); };
+      q('#move-set').onclick = () => { ui.move!.troops = Math.max(minMove, Math.min(maxMove, Number(q<HTMLInputElement>('#move-input').value) || minMove)); renderSheet(); };
+      q('#move-min').onclick = () => { ui.move!.troops = minMove; renderSheet(); };
+      q('#move-max').onclick = () => { ui.move!.troops = maxMove; renderSheet(); };
+      q('#move-confirm').onclick = onConfirmMove;
     } else if (ui.phase === 'waiting') {
       const p = s.players[s.activePlayerIndex];
       sheet.innerHTML = `<div class="hint">${ui.sealing ? 'Resolving your turn…' : p ? `<b style="color:${color(s.activePlayerIndex)}">${p.name}</b> is moving…` : 'Working…'}</div>`;
     } else {
       const won = s.winnerIndex === me;
-      sheet.innerHTML = `
-        <div class="big"><span class="n" style="color:${won ? 'var(--lime)' : 'var(--mag)'}">${won ? '★' : '✕'}</span><span class="t">${s.phase === 'GAME_OVER' ? (won ? 'VICTORY' : `${s.players[s.winnerIndex!].name} WINS`) : 'YOU WERE ELIMINATED'}<small>Turn ${s.turnNumber} · ${s.players.length} commanders</small></span></div>
-        <div class="actions">${s.phase === 'GAME_OVER' ? '<button class="btn" id="stats">STATS</button>' : '<button class="btn" id="watch">FINISH ▸▸</button>'}<button class="primary btn" id="menu">MENU</button></div>`;
+      sheet.innerHTML = gameOverPhaseHtml(won, s.phase === 'GAME_OVER' ? s.players[s.winnerIndex!].name : null, roundOf(s.turnNumber, s.activePlayerIndex), s.players.length);
       q('#menu').onclick = exit;
       if (s.phase === 'GAME_OVER') q('#stats').onclick = victory;
       if (s.phase !== 'GAME_OVER') q('#watch').onclick = async () => { await runBots(true); ui.phase = 'waiting'; await afterAction(); };
     }
+    const results = sheet.querySelector<HTMLDetailsElement>('#battle-results');
+    if (results) results.ontoggle = () => { ui.battleResultsOpen = results.open; };
     sheet.querySelectorAll<HTMLElement>('[data-go]').forEach(b => b.onclick = () => setPhase(b.dataset.go as Phase));
-    sheet.querySelectorAll<HTMLElement>('[data-step]').forEach(b => b.onclick = () => { ui.step = Number(b.dataset.step); renderSheet(); });
+    sheet.querySelectorAll<HTMLElement>('[data-step]').forEach(b => b.onclick = () => {
+      const step = Number(b.dataset.step);
+      ui.step = step;
+      // Update pending attack troop count when step changes during attack selection
+      if (ui.phase === 'move' && ui.pendingAttack) {
+        const maxTroops = getScaledTroops(ui.pendingAttack.from) - 1;
+        if (step === 999) {
+          ui.pendingAttack.troops = Math.min(maxTroops, getScaledTroops(ui.pendingAttack.from));
+        } else {
+          ui.pendingAttack.troops = Math.min(Math.max(1, step), maxTroops);
+        }
+      }
+      renderSheet();
+    });
   }
 
   function renderDrawer(): void {
     const s = S();
-    q('#roster').innerHTML = s.players.map((p, i) => {
-      const terr = s.territories.filter(t => t.owner === i);
-      return `<li class="roster-row ${i === s.activePlayerIndex ? 'active' : ''} ${p.eliminated ? 'out' : ''}" style="--pc:${color(i)}"><span class="sw"></span>
-        <span class="nm">${p.name}${i === me && p.name !== 'YOU' ? ' (YOU)' : ''}</span>
-        <span class="st"><span>${terr.length}<em>TER</em></span><span>${terr.reduce((a, t) => a + t.troops, 0)}<em>TRP</em></span><span>${p.cards.length}<em>CRD</em></span></span></li>`;
-    }).join('');
-    q('#continents').innerHTML = map.continents.map(c => {
-      const counts = new Array(s.players.length).fill(0);
-      c.territoryIds.forEach(id => counts[s.territories[id].owner]++);
-      const lead = counts.indexOf(Math.max(...counts));
-      return `<li class="cont-row" style="--cc:${NEON.continents[c.id % NEON.continents.length]};--pc:${color(lead)}"><span class="sw"></span><span>${c.name}</span><span class="bn">+${c.bonus}</span>
-        <span class="bar"><span style="width:${(counts[lead] * 100) / c.territoryIds.length}%"></span></span><span class="own">${counts[lead]}/${c.territoryIds.length} ${s.players[lead].name}</span></li>`;
-    }).join('');
+    q('#roster').innerHTML = commanderRosterHtml(s, me);
+    q('#continents').innerHTML = continentIntelHtml(map, s);
     q('#log').innerHTML = ui.log.length ? ui.log.join('') : '<li class="miss">No turns played yet.</li>';
   }
 
-  function describe(o: TurnOutcome): string[] {
-    const r = o.resolution;
+  function describe(r: TurnResolutionResult): string[] {
     const who = `<span class="who" style="--pc:${color(r.playerIndex)}">${S().players[r.playerIndex].name}</span>`;
     const lines = r.attackLogs.filter(l => !l.skippedReason).map(l =>
       `<li>${who} ${tn(l.fromTerritoryId)} → ${tn(l.toTerritoryId)} · ${l.waves.length} roll${l.waves.length === 1 ? '' : 's'} · ${l.conquered ? '<span class="cap">CAPTURED</span>' : '<span class="miss">held</span>'}</li>`);
-    return [`<li>${who} <b>T${r.turnNumber}</b> +${r.reinforcements.total} troops${r.cardDrawn ? ' · drew a card' : ''}</li>`, ...lines];
+    return [`<li>${who} <b>T${roundOf(r.turnNumber, r.playerIndex)}</b> +${r.reinforcements.total} troops${r.cardDrawn ? ' · drew a card' : ''}</li>`, ...lines];
   }
 
   /* ------------------------------ interaction ------------------------------ */
@@ -292,7 +556,7 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     const s = S(); const t = map.territories[id]; const c = map.continents[t.continentId];
     const p = q('#pill');
     p.style.setProperty('--pc', color(s.territories[id].owner));
-    p.innerHTML = `<span class="sw"></span><div><b>${t.name}</b><br><small>${s.players[s.territories[id].owner].name} · ${c.name} +${c.bonus}</small></div><span class="tr">${projectedTroops()[id]}</span>`;
+    p.innerHTML = territoryPillHtml(t.name, s.players[s.territories[id].owner].name, c.name, c.bonus, projectedTroops()[id]);
     p.hidden = false;
     clearTimeout(pillTimer); pillTimer = window.setTimeout(() => { p.hidden = true; }, 2500);
   }
@@ -308,7 +572,6 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     if (!g) { ui.sel = null; draw(); return; }
     const id = Number(g.getAttribute('data-t'));
     pill(id);
-    const s = S();
     if (ui.phase === 'setup') place(ui.setup, id, setupLeft());
     else if (ui.phase === 'draft') place(ui.draft, id, draftLeft());
     else if (ui.phase === 'attack') {
@@ -325,14 +588,66 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
         ui.sel = null;
       } else if (isSource(id)) ui.sel = id;
       else return void toast('Target must border your selection');
+    } else if ((ui.phase === 'commit' || ui.phase === 'interactive_attack') && ui.interactive) {
+      // Interactive attack mode: select source → target → set troops
+      if (ui.sel === null) {
+        // Select source territory (must own it and have ≥2 troops)
+        if (!owns(id)) return void toast('Tap one of your territories first');
+        const troops = getScaledTroops(id);
+        if (troops < 2) return void toast('Need at least 2 troops to attack');
+        ui.sel = id;
+      } else if (id === ui.sel) {
+        // Deselect
+        ui.sel = null;
+      } else if (map.territories[id].neighbors.includes(ui.sel!) || map.territories[ui.sel!].neighbors.includes(id)) {
+        // Target can be any adjacent territory (enemy or own)
+        if (id === ui.sel) return;
+        const sourceTroops = getScaledTroops(ui.sel!);
+        const pending = pendingCaptures();
+        const isSource = (x: TerritoryId) => (owns(x) && getScaledTroops(x) >= 2) || pending.has(x);
+        if (isSource(id)) {
+          // This is a valid source — allow it as a re-target
+          ui.sel = id;
+          ui.pendingAttack = null;
+        } else if (owns(id)) {
+          // Own territory with <2 troops — re-select as source candidate
+          ui.sel = id;
+          ui.pendingAttack = null;
+        } else {
+          // It's an enemy target
+          ui.pendingAttack = { from: ui.sel, to: id, troops: sourceTroops };
+          ui.phase = 'move'; // show slider for troop count
+        }
+        draw();
+      } else {
+        return void toast('Target must be adjacent');
+      }
+      draw();
+    } else if (ui.phase === 'move') {
+      // Move step: tap destination to confirm move
+      if (ui.sel && map.territories[ui.sel].neighbors.includes(id)) {
+        if (id === ui.sel) {
+          ui.sel = null;
+          draw();
+          return;
+        }
+        // Select this as move destination
+        ui.sel = id;
+        draw();
+      } else {
+        return void toast('Must be adjacent to source');
+      }
     } else if (ui.phase === 'fortify') {
       if (!owns(id)) return void toast('Fortify between your own territories');
+      const live = ui.interactive ? ui.interactive.state.liveState : S();
       if (ui.sel === null) {
-        if (projectedTroops()[id] < 2) return void toast('Need at least 2 troops to move');
+        const troopsHere = ui.interactive ? getScaledTroops(id) : projectedTroops()[id];
+        if (troopsHere < 2) return void toast('Need at least 2 troops to move');
         ui.sel = id;
       } else if (id === ui.sel) ui.sel = null;
-      else if (connectedOwned(map, s, me, ui.sel).has(id)) {
-        ui.fortify = { fromTerritoryId: ui.sel, toTerritoryId: id, troops: projectedTroops()[ui.sel] - 1 };
+      else if (connectedOwned(map, live, me, ui.sel).has(id)) {
+        const sourceTroops = ui.interactive ? getScaledTroops(ui.sel) : projectedTroops()[ui.sel];
+        ui.fortify = { fromTerritoryId: ui.sel, toTerritoryId: id, troops: sourceTroops - 1 };
         ui.sel = null;
       } else return void toast('Must be connected through your territories');
     }
@@ -359,6 +674,7 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
 
   function resetPlan(): void {
     ui.trades = []; ui.draft.clear(); ui.attacks = []; ui.fortify = null; ui.sel = null;
+    ui.interactive = null; ui.move = null; ui.pendingAttack = null; ui.handSnapshot = null;
   }
 
   async function deploy(): Promise<void> {
@@ -394,50 +710,205 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     o.onclick = null;
   }
 
-  /** Steps through a turn's replay frames on the board, with the camera following each battle. */
+  /** Only bot replays take control of the camera; player actions keep the current view. */
   async function playReplay(before: GameState, outcome: TurnOutcome): Promise<void> {
-    const frames = buildReplay(map, before, outcome.resolution);
+    const frames = buildReplay(map, before, outcome.resolution, roundOf(outcome.resolution.turnNumber, outcome.resolution.playerIndex));
+    const followBot = before.players[outcome.resolution.playerIndex].isBot;
     ui.phase = 'replay';
     ui.replayWho = outcome.resolution.playerIndex;
     ui.replayTurn = outcome.resolution.turnNumber;
+    if (followBot && !ui.skip && ui.alive) {
+      camera.fitAnimated();
+      await beat(320);
+    }
     for (const f of frames) {
       if (ui.skip || !ui.alive) break;
       ui.frame = f;
       draw();
-      if (f.focus?.length) camera.focusOn(f.focus.map(id => territoryPoint(map, id, ui.rotated)));
+      if (followBot && f.focus?.length) camera.focusOn(f.focus.map(id => territoryPoint(map, id, ui.rotated)));
       await beat((BEAT_MS * f.weight) / ui.speed);
     }
     ui.frame = null;
+    if (followBot && ui.alive) {
+      if (!ui.skip) {
+        camera.fitAnimated();
+        await beat(320);
+      }
+      camera.fit();
+    }
     ui.skip = false;
-    camera.fitAnimated();
   }
 
   async function commitTurn(): Promise<void> {
     const plan = buildPlan();
     const before = S();
-    ui.phase = 'waiting';
-    draw();
-    let outcome: TurnOutcome;
-    try {
-      outcome = await game.submitTurnCommit(plan);
-    } catch (err) {
-      ui.phase = 'commit';
+
+    // If user has queued attacks, use batch resolution
+    if (ui.attacks.length > 0) {
+      ui.phase = 'waiting';
       draw();
+      const outcome = await game.submitTurnCommit(plan);
+      ui.phase = 'waiting';
+      draw();
+      await sealOverlay(outcome);
+      await playReplay(before, outcome);
+      await afterAction();
+      return;
+    }
+
+    // Interactive flow: draft complete, enter interactive attack selection
+    try {
+      console.log('[commitTurn] plan.cardTrades:', JSON.stringify(plan.cardTrades));
+      console.log('[commitTurn] hand:', S().players[me].cards.map(c => ({ id: c.id, emblem: c.emblem, territoryId: c.territoryId })));
+      console.log('[commitTurn] ui.trades:', JSON.stringify(ui.trades));
+      // Snapshot hand before startInteractiveTurn removes traded cards
+      ui.handSnapshot = S().players[me].cards.slice();
+      const interactiveState = game.startInteractiveTurn(plan);
+      ui.interactive = { state: interactiveState, lastResult: null };
+      ui.phase = 'interactive_attack';
+      draw();
+    } catch (err) {
       toast(err instanceof Error ? err.message : String(err));
       return;
     }
-    resetPlan();
-    opts.onChange?.(game);
-    ui.sealing = true;
+  }
+
+  /** Queue an attack and resolve it. */
+  async function onConfirmAttack(): Promise<void> {
+    if (!ui.pendingAttack || !ui.interactive) return;
+    const { from, to, troops } = ui.pendingAttack;
+    const maxTroops = getScaledTroops(from) - 1;
+    const actualTroops = Math.min(troops, maxTroops);
+    if (actualTroops < 1) return toast('Must attack with at least 1 troop');
+
+    const maxAttackers = Math.min(3, actualTroops);
+    const stopThreshold = attackStopThreshold(actualTroops > 1 ? ui.stopAtTroops : null);
+    const order: AttackCampaignOrder = {
+      orderId: `interactive-${Date.now()}`,
+      fromTerritoryId: from,
+      toTerritoryId: to,
+      attackerDice: maxAttackers,
+      stopWhenAttackerAtOrBelow: stopThreshold,
+      occupyMode: { type: 'NONE' }, // No auto-move; user chooses in move step
+    };
+
+    const { result, state } = game.executeInteractiveAttack(ui.interactive.state, order);
+    console.log('attack result:', result);
+
+    // Check if conquered
+    if (result.attack.conquered) {
+      // Enter move step: user chooses how many troops to move into conquered territory
+      // Minimum = attacker dice count (how many you attacked with), max = all but one from source
+      const lastWave = result.attack.waves[result.attack.waves.length - 1];
+      const minMove = lastWave?.attackerDice?.length ?? maxAttackers;
+      const srcTroops = getScaledTroops(from);
+      const maxMove = Math.max(0, srcTroops - 1);
+      ui.interactive = { state, lastResult: result };
+      ui.move = { from, to, troops: Math.max(0, Math.min(minMove, maxMove)), minMove };
+      ui.pendingAttack = null; // clear so move-phase rendering fires, not pending-attack rendering
+      ui.phase = 'move';
+      ui.sel = to;
+      draw();
+    } else {
+      // Attack failed — go back to attack selection
+      ui.interactive = { state, lastResult: result };
+      ui.phase = 'commit';
+      ui.sel = null;
+      ui.pendingAttack = null;
+      draw();
+    }
+  }
+
+  /** Called when user confirms troop count in move step. */
+  async function onConfirmMove(): Promise<void> {
+    if (!ui.interactive || !ui.move) { console.log('[onConfirmMove] early return: interactive=', !!ui.interactive, 'move=', !!ui.move); return; }
+    const { from, to, troops } = ui.move;
+    console.log('[onConfirmMove] from=', from, 'to=', to, 'troops=', troops);
+    console.log('[onConfirmMove] move.minMove=', ui.move.minMove);
+    console.log('[onConfirmMove] source troops=', getScaledTroops(from));
+    const newState = game.moveTroopsToConquered(ui.interactive.state, from, to, troops);
+    console.log('[onConfirmMove] result: troops after move=', getScaledTroops(to));
+    ui.interactive = { state: newState.state, lastResult: ui.interactive.lastResult };
+    ui.move = null;
+    ui.sel = null;
+
+    if (newState.state.liveState.territories.every(t => t.owner === me)) {
+      await onCompleteAttack();
+      return;
+    }
+
+    // Check if stopAtTroops target is met
+    if (ui.stopAtTroops != null) {
+      const currentTroops = Math.max(0, getScaledTroops(from) - 1);
+      if (currentTroops <= ui.stopAtTroops) {
+        // Pause campaign — show STOP button
+        ui.phase = 'commit';
+        ui.pendingAttack = null;
+        draw();
+        // Show pause banner
+        const sheet = q('#sheet');
+        sheet.innerHTML = `
+          <div class="big"><span class="n" style="color:var(--yellow)">⏸</span><span class="t">STOPPED<small>Source at ${currentTroops} / ${ui.stopAtTroops} attacking armies</small></span></div>
+          <div class="actions">
+            <button class="btn" id="atk-cancel">CANCEL CAMPAIGN</button>
+            <button class="primary btn" id="atk-resume">RESUME ▸</button>
+          </div>`;
+        q('#atk-cancel').onclick = () => {
+          ui.stopAtTroops = null;
+          ui.phase = 'commit';
+          ui.interactive = null;
+          draw();
+        };
+        q('#atk-resume').onclick = () => {
+          ui.stopAtTroops = null;
+          ui.phase = 'commit';
+          ui.sel = null;
+          ui.pendingAttack = null;
+          draw();
+        };
+        return;
+      }
+    }
+
+    ui.phase = 'commit'; // back to attack selection
     draw();
-    await sealOverlay(outcome);
-    ui.sealing = false;
+  }
+
+  /** Go back to attack selection from attack result view. */
+  function onAttackNext(): void {
+    ui.sel = null;
+    ui.pendingAttack = null;
+    draw();
+  }
+
+  /** Transition to fortify phase. */
+  function onFortifyNow(): void {
+    ui.phase = 'fortify';
+    ui.sel = null;
+    draw();
+  }
+
+  /** Complete the attack step and transition to fortify. */
+  async function onCompleteAttack(): Promise<void> {
+    if (!ui.interactive) return;
+    // Apply fortify if planned
+    if (ui.fortify && !ui.interactive.state.liveState.territories.every(t => t.owner === me)) {
+      const newState = game.executeInteractiveFortify(ui.interactive.state, ui.fortify);
+      ui.interactive = { state: newState.state, lastResult: ui.interactive.lastResult };
+    }
+    // Finish the turn
+    const outcome = game.finishInteractiveTurn(ui.interactive.state);
+    ui.interactive = null;
+    ui.fortify = null;
+    ui.phase = 'waiting';
+    opts.onChange?.(game);
     ui.skip = false;
-    await playReplay(before, outcome);
+    if (outcome.resolution.newState.phase !== 'GAME_OVER') await sealOverlay(outcome);
     await afterAction();
   }
 
   /** Runs bot turns until it's the human's turn or the game ends. */
+
   async function runBots(fast = false): Promise<void> {
     ui.phase = 'waiting';
     draw();
@@ -478,19 +949,44 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
   /* ------------------------------ wiring ------------------------------ */
   q('#open-drawer').onclick = () => q('#drawer').classList.add('open');
   q('#drawer').onclick = e => { if ((e.target as HTMLElement).id === 'drawer') q('#drawer').classList.remove('open'); };
-  q('#exit').onclick = () => { if (confirm('Leave this game? (It is saved — you can continue from the menu.)')) exit(); };
+  q('#exit').onclick = () => { if (S().phase === 'GAME_OVER' || confirm('Leave this game? It is saved — continue it from the menu.')) exit(); };
   q('#fit').onclick = () => camera.fit();
   q('#event-log').onclick = () => { q('#drawer').classList.remove('open'); openEventInspector(q('.game'), game); };
   const autoSkip = q<HTMLInputElement>('#auto-skip');
   autoSkip.checked = ui.autoSkipBots;
   autoSkip.onchange = () => { ui.autoSkipBots = autoSkip.checked; localStorage.setItem('nd.autoSkipBots', autoSkip.checked ? '1' : '0'); };
   q('#phases').querySelectorAll<HTMLElement>('button').forEach(b => b.onclick = () => {
-    const target = b.dataset.p as Phase;
+    if (ui.interactive) return toast('Complete your interactive attacks first');
+    const target = b.dataset.p as 'draft' | 'attack' | 'fortify' | 'commit';
     if (target !== 'draft' && (draftLeft() !== 0 || tradeRequired())) return toast('Place all your troops first');
+    const curIdx = PLAN_PHASES.indexOf(ui.phase as typeof PLAN_PHASES[number]);
+    const tgtIdx = PLAN_PHASES.indexOf(target);
+    if (curIdx < 0 || tgtIdx > curIdx + 1) return toast('Follow the turn order');
     setPhase(target);
   });
   const resize = new ResizeObserver(() => draw());
   resize.observe(board);
+
+  // Desktop keyboard shortcuts (ignored while typing or when a modal is open).
+  const onKey = (e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target instanceof Element && e.target.closest('.cards-help summary') && (e.key === 'Enter' || e.key === ' ')) return;
+    const modal = root.querySelector('.modal');
+    if (e.key === 'Escape') {
+      if (modal) modal.remove(); else if (q('#drawer').classList.contains('open')) q('#drawer').classList.remove('open'); else { ui.sel = null; draw(); }
+      return;
+    }
+    if (modal) return;
+    const k = e.key.toLowerCase();
+    if (ui.phase === 'replay' && (k === ' ' || k === 'enter')) { e.preventDefault(); ui.skip = true; ui.wake?.(); return; }
+    if (q('#overlay').classList.contains('show') && k === ' ') { e.preventDefault(); ui.skip = true; ui.wake?.(); return; }
+    if (k === 'enter') { e.preventDefault(); root.querySelector<HTMLButtonElement>('#sheet .primary:not([disabled])')?.click(); }
+    else if (['1', '2', '3', '4'].includes(k) && !q('#phases').hidden) q('#phases').querySelectorAll<HTMLButtonElement>('button')[Number(k) - 1].click();
+    else if (k === 'u') root.querySelector<HTMLButtonElement>('#undo')?.click();
+    else if (k === '0') camera.fit();
+    else if (k === 'l') openEventInspector(q('.game'), game);
+  };
+  addEventListener('keydown', onKey);
 
   const s0 = S();
   if (s0.phase === 'SETUP_PLACEMENT' && !s0.players[me].setupDone) ui.phase = 'setup';
@@ -498,8 +994,9 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
   else if (game.isLocalTurn()) ui.phase = 'draft';
   else { ui.phase = 'waiting'; void afterAction(); }
   draw(true);
+  if (s0.phase === 'GAME_OVER') victory();
 
-  return () => { ui.alive = false; resize.disconnect(); offTurn(); root.innerHTML = ''; };
+  return () => { ui.alive = false; resize.disconnect(); offTurn(); removeEventListener('keydown', onKey); root.innerHTML = ''; };
 }
 
 const GAME_HTML = `
@@ -515,16 +1012,18 @@ const GAME_HTML = `
     <button data-p="draft">DRAFT<i id="badge-draft"></i></button>
     <button data-p="attack">ATTACK<i id="badge-attack"></i></button>
     <button data-p="fortify">FORTIFY</button>
-    <button data-p="commit">COMMIT</button>
+    <button data-p="commit">END TURN</button>
   </nav>
   <section class="sheet glass" id="sheet"></section>
   <div class="drawer" id="drawer"><div class="drawer-panel glass">
     <h3>COMMANDERS</h3><ul id="roster"></ul>
     <h3>CONTINENTS</h3><ul id="continents"></ul>
-    <h3>BATTLE LOG</h3><ul class="log" id="log"></ul>
     <h3>SETTINGS</h3><label class="setting"><input type="checkbox" id="auto-skip"> Auto-skip bot replays</label>
+    <p class="keys">Keys: <b>1–4</b> phases · <b>Enter</b> next/commit · <b>U</b> undo · <b>Space</b> skip replay · <b>0</b> fit · <b>L</b> log · <b>Esc</b> cancel</p>
+    <details class="log-wrap" id="log-wrap"><summary>BATTLE LOG</summary><ul class="log" id="log"></ul></details>
     <button class="btn exit" id="event-log">📜 EVENT LOG</button>
     <button class="btn exit" id="exit">◂ MENU</button>
   </div></div>
   <div class="overlay" id="overlay"></div>
+  <div class="debug-overlay" id="debug-overlay" hidden></div>
 </div>`;

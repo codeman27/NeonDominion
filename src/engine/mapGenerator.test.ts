@@ -68,22 +68,33 @@ describe('generateMap', () => {
     for (const c of m.continents) {
       expect(c.territoryIds.length).toBeGreaterThanOrEqual(MAP_TUNING.minContinentTerritories);
       expect(c.territoryIds.length).toBeLessThanOrEqual(MAP_TUNING.maxContinentTerritories);
-      const entries = m.chokepoints.filter(cp => m.territories[cp.a].continentId === c.id || m.territories[cp.b].continentId === c.id).length;
+      const entries = c.territoryIds.filter(id => m.territories[id].neighbors.some(n => m.territories[n].continentId !== c.id)).length;
       expect(c.bonus).toBe(continentBonus(c.territoryIds.length, entries));
       expect(components(c.territoryIds, id => m.territories[id].neighbors)).toBe(1);
     }
 
-    // Chokepoints are the ONLY borders between continents.
+    // Larger continents are paired on mainlands; at least one smaller island remains.
+    const ranked = [...m.continents].sort((a, b) => b.territoryIds.length - a.territoryIds.length || a.id - b.id).map(c => c.id);
+    const pairedCount = 2 * Math.floor((C - 1) / 2);
+    const mainlands = Array.from({ length: pairedCount / 2 }, (_, i) => ranked.slice(i * 2, i * 2 + 2));
     const linkPairs = new Set(m.chokepoints.map(cp => [cp.a, cp.b].sort((x, y) => x - y).join('-')));
     for (const cp of m.chokepoints) expect(m.territories[cp.a].continentId).not.toBe(m.territories[cp.b].continentId);
     for (const t of m.territories) for (const n of t.neighbors) {
-      if (m.territories[n].continentId !== t.continentId) expect(linkPairs.has([t.id, n].sort((x, y) => x - y).join('-'))).toBe(true);
+      if (m.territories[n].continentId !== t.continentId && !mainlands.some(cs => cs.includes(t.continentId) && cs.includes(m.territories[n].continentId))) {
+        expect(linkPairs.has([t.id, n].sort((x, y) => x - y).join('-'))).toBe(true);
+      }
     }
-    expect(m.chokepoints.length).toBeGreaterThanOrEqual(C - 1);
+    for (const mainland of mainlands) for (const [i, c] of mainland.entries()) {
+      const crossings = m.territories.filter(t => t.continentId === c)
+        .flatMap(t => t.neighbors.filter(n => m.territories[n].continentId === mainland[1 - i]).map(n => [t.id, n]));
+      expect(new Set(crossings.map(([a]) => a)).size).toBeGreaterThanOrEqual(2);
+      expect(crossings.some(([a, b]) => crossings.some(([x, y]) => a !== x && b !== y))).toBe(true);
+    }
+    expect(m.chokepoints.length).toBeGreaterThanOrEqual(C - mainlands.length - 1);
     const perContinent = new Array(C).fill(0);
     for (const cp of m.chokepoints) { perContinent[m.territories[cp.a].continentId]++; perContinent[m.territories[cp.b].continentId]++; }
-    for (const n of perContinent) {
-      expect(n).toBeGreaterThanOrEqual(1);
+    for (const [c, n] of perContinent.entries()) {
+      expect(n).toBeGreaterThanOrEqual(ranked.slice(0, pairedCount).includes(c) ? 0 : 1);
       expect(n).toBeLessThanOrEqual(MAP_TUNING.maxLinksPerContinent);
     }
 

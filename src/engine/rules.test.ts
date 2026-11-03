@@ -17,12 +17,12 @@ describe('baseReinforcements', () => {
 
 describe('cardSetValue', () => {
   it.each<[string, CardEmblem[], number | null]>([
-    ['3 infantry', ['INFANTRY', 'INFANTRY', 'INFANTRY'], 4],
+    ['3 infantry', ['INFANTRY', 'INFANTRY', 'INFANTRY'], 3],
     ['3 cavalry', ['CAVALRY', 'CAVALRY', 'CAVALRY'], 6],
     ['3 artillery', ['ARTILLERY', 'ARTILLERY', 'ARTILLERY'], 8],
     ['one of each', ['INFANTRY', 'CAVALRY', 'ARTILLERY'], 10],
     ['one of each (any order)', ['ARTILLERY', 'INFANTRY', 'CAVALRY'], 10],
-    ['wild + 2 infantry → best is 3 infantry', ['WILD', 'INFANTRY', 'INFANTRY'], 4],
+    ['wild + 2 infantry → best is 3 infantry', ['WILD', 'INFANTRY', 'INFANTRY'], 3],
     ['wild + 2 artillery', ['ARTILLERY', 'WILD', 'ARTILLERY'], 8],
     ['wild + inf + cav → one of each', ['WILD', 'INFANTRY', 'CAVALRY'], 10],
     ['2 wilds + anything → one of each', ['WILD', 'WILD', 'INFANTRY'], 10],

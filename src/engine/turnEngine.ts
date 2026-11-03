@@ -52,7 +52,7 @@ export function computeReinforcements(map: GameMap, state: GameState, player: Pl
   };
 }
 
-function tradeCards(state: GameState, plan: TurnActionPlan): { trades: TerritoryCard[][]; errors: string[] } {
+export function tradeCards(state: GameState, plan: TurnActionPlan): { trades: TerritoryCard[][]; errors: string[] } {
   const errors: string[] = [];
   const hand = state.players[plan.playerIndex]?.cards ?? [];
   const byId = new Map(hand.map(c => [c.id, c]));

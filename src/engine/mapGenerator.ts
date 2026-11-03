@@ -6,11 +6,10 @@ import { hexDistance, hexKey, hexLine, hexNeighbors, hexOffsetsWithin, offsetToA
  * Continents-first procedural map generator.
  *
  *  1. Split the territory count into continents of varied size.
- *  2. Grow every continent as its own landmass on a shared canvas. A hex can only be claimed if no
- *     other continent's land is within `continentSeparation - 1`, so continents never touch.
- *  3. Link continents with a minimum spanning tree (guarantees connectivity) plus a few extra
- *     short links (gives alternative routes). Short gaps become 1–3 hex LAND BRIDGES, long gaps become
- *     SEA LANES. These links are the ONLY inter-continent borders → every link is a chokepoint.
+ *  2. Pair larger continents on shared landmasses, keeping at least one smaller island continent.
+ *     Split each mainland into two contiguous continents with a broad natural frontier.
+ *  3. Connect landmasses with a minimum spanning tree plus a few extra short links.
+ *     Short gaps become LAND BRIDGES, long gaps become SEA LANES.
  *  4. Partition each continent into territories (farthest-point seeds, balanced flood fill, Lloyd relax).
  *  5. Validate; on failure retry with the next deterministic attempt.
  *
@@ -18,7 +17,7 @@ import { hexDistance, hexKey, hexLine, hexNeighbors, hexOffsetsWithin, offsetToA
  * comes from a SHA-256 DRBG seeded by (seed, playerCount, attempt), so every device gets the same map.
  */
 
-export const MAP_GENERATOR_VERSION = 2;
+export const MAP_GENERATOR_VERSION = 3;
 
 export const MAP_SCALE: Readonly<Record<number, { territories: number; continents: number }>> = {
   2: { territories: 14, continents: 3 },
@@ -43,7 +42,7 @@ export const MAP_TUNING = {
   maxBridgeDistance: 4,
   /** Extra (non-spanning-tree) links are only added if no longer than this. */
   maxExtraLinkDistance: 7,
-  /** No continent gets more than this many links (keeps chokepoints scarce and meaningful). */
+  /** Maximum narrow links per continent, in addition to natural mainland borders. */
   maxLinksPerContinent: 3,
   minTerritoryHexes: 3,
   maxTerritoryHexes: 14,
@@ -76,7 +75,7 @@ export interface MapGenOptions {
 }
 
 export type RejectReason =
-  | 'centers' | 'growth-boxed-in' | 'no-spanning-links' | 'partition' | 'territory-size' | 'dead-end' | 'stray-border' | 'disconnected';
+  | 'centers' | 'growth-boxed-in' | 'no-spanning-links' | 'partition' | 'territory-size' | 'dead-end' | 'stray-border' | 'disconnected' | 'narrow-frontier';
 
 export interface MapGenReport {
   map: GameMap;
@@ -111,12 +110,25 @@ function tryGenerate(rng: DeterministicRng, seed: string, playerCount: number, a
 
   const canvas = buildCanvas(budgets.reduce((a, b) => a + b, 0));
   const noise = buildNoise(canvas, rng.fork('noise'));
-  const centers = pickCenters(canvas, C, rng.fork('centers'));
+  // Pair larger continents, leaving one or two smaller continents as islands.
+  const ranked = sizes.map((_, c) => c).sort((a, b) => sizes[b] - sizes[a] || a - b);
+  const pairedCount = 2 * Math.floor((C - 1) / 2);
+  const mainlands = Array.from({ length: pairedCount / 2 }, (_, i) => ranked.slice(i * 2, i * 2 + 2));
+  const regions = [...mainlands, ...ranked.slice(pairedCount).map(c => [c])];
+  const centers = pickCenters(canvas, regions.length, rng.fork('centers'));
   if (!centers) return 'centers';
 
-  const grown = growContinents(canvas, noise, centers, budgets, rng.fork('grow'));
+  const grown = growContinents(canvas, noise, centers, regions.map(cs => cs.reduce((sum, c) => sum + budgets[c], 0)), rng.fork('grow'));
   if (!grown) return 'growth-boxed-in';
-  const { landByContinent, owner } = grown;
+  const landByContinent: AxialCoord[][] = sizes.map(() => []);
+  const mainlandRng = rng.fork('mainland');
+  regions.forEach((cs, i) => {
+    const land = grown.landByContinent[i];
+    const parts = cs.length === 1 ? [land] : partitionOnce(land, 2, new Set(land.map(hexKey)), mainlandRng);
+    cs.forEach((c, j) => { landByContinent[c] = parts[j]; });
+  });
+  const owner = new Map<HexKey, number>();
+  landByContinent.forEach((land, c) => land.forEach(h => owner.set(hexKey(h), c)));
 
   const links = linkContinents(landByContinent, owner, rng.fork('links'));
   if (!links) return 'no-spanning-links';
@@ -174,10 +186,18 @@ function tryGenerate(rng: DeterministicRng, seed: string, playerCount: number, a
   const linkPairs = new Set(chokepoints.map(cp => pairKey(cp.a, cp.b)));
   for (let id = 0; id < groups.length; id++) {
     for (const n of adj[id]) {
-      if (groups[n].continent !== groups[id].continent && !linkPairs.has(pairKey(id, n))) return 'stray-border';
+      if (groups[n].continent !== groups[id].continent
+        && !mainlands.some(cs => cs.includes(groups[n].continent) && cs.includes(groups[id].continent))
+        && !linkPairs.has(pairKey(id, n))) return 'stray-border';
     }
   }
   if (!isConnected(adj)) return 'disconnected';
+  // Neither side of the broad frontier can be defended through a single territory.
+  for (const mainland of mainlands) {
+    const frontier = mainland.map((c, i) => groups.filter((g, id) => g.continent === c
+      && [...adj[id]].some(n => groups[n].continent === mainland[1 - i])));
+    if (frontier.some(territories => territories.length < 2)) return 'narrow-frontier';
+  }
 
   // Names, bonuses, output.
   const nameRng = rng.fork('names');
@@ -196,7 +216,7 @@ function tryGenerate(rng: DeterministicRng, seed: string, playerCount: number, a
 
   const continents: Continent[] = sizes.map((_, c) => {
     const ids = territories.filter(t => t.continentId === c).map(t => t.id);
-    const entryPoints = chokepoints.filter(cp => territories[cp.a].continentId === c || territories[cp.b].continentId === c).length;
+    const entryPoints = ids.filter(id => [...adj[id]].some(n => groups[n].continent !== c)).length;
     return { id: c, name: cNames[c], territoryIds: ids, bonus: continentBonus(ids.length, entryPoints) };
   });
 
@@ -204,7 +224,7 @@ function tryGenerate(rng: DeterministicRng, seed: string, playerCount: number, a
 }
 
 /**
- * Reinforcement bonus for holding a whole continent: ⌊territories / 3⌋ + entry points (bridges + sea lanes),
+ * Reinforcement bonus for holding a whole continent: ⌊territories / 3⌋ + border territories,
  * clamped to 2..10. More territories to conquer and more doors to defend ⇒ bigger reward. Integer-only.
  */
 export function continentBonus(territories: number, entryPoints: number): number {
@@ -354,6 +374,16 @@ function linkContinents(land: AxialCoord[][], owner: Map<HexKey, number>, rng: D
   // Degree-capped Kruskal minimum spanning tree (keeps every continent at ≤ maxLinksPerContinent).
   const parent = Array.from({ length: C }, (_, i) => i);
   const find = (x: number): number => (parent[x] === x ? x : (parent[x] = find(parent[x])));
+  const naturalPairs = new Set<string>();
+  land.forEach((hexes, a) => {
+    for (const h of hexes) for (const n of hexNeighbors(h)) {
+      const b = owner.get(hexKey(n));
+      if (b !== undefined && b !== a) {
+        naturalPairs.add(pairKey(a, b));
+        parent[find(a)] = find(b);
+      }
+    }
+  });
   const degree = new Array<number>(C).fill(0);
   const cap = MAP_TUNING.maxLinksPerContinent;
   const chosen: Link[] = [];
@@ -361,8 +391,8 @@ function linkContinents(land: AxialCoord[][], owner: Map<HexKey, number>, rng: D
     const ra = find(l.a); const rb = find(l.b);
     if (ra !== rb && degree[l.a] < cap && degree[l.b] < cap) { parent[ra] = rb; chosen.push(l); degree[l.a]++; degree[l.b]++; }
   }
-  if (chosen.length !== C - 1) return null;
-  const extras = candidates.filter(l => !chosen.includes(l));
+  if (parent.some((_, c) => find(c) !== find(0))) return null;
+  const extras = candidates.filter(l => !chosen.includes(l) && !naturalPairs.has(pairKey(l.a, l.b)));
 
   // A few extra links create alternative routes (loops) without flooding the map with borders.
   let extraBudget = Math.floor((C - 1) / 2);

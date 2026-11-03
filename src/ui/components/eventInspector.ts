@@ -1,6 +1,8 @@
 import { computeGameStats } from '../../transport/gameStats';
 import type { LocalGame } from '../../transport/localTransport';
 import { NEON } from '../theme';
+import { roundOfTurn } from '../rounds';
+import { escapeHtml } from './gamePhaseUi';
 
 const PAGE = 120;
 
@@ -67,19 +69,28 @@ export function showVictory(host: HTMLElement, game: LocalGame, actions: { onMen
   const s = game.getState();
   const me = game.localPlayerIndex;
   const stats = computeGameStats(game.exportEventLog());
-  const won = s.winnerIndex === me;
-  const winner = s.winnerIndex ?? 0;
-  const rows = s.players.map((p, i) => {
-    const st = stats.players[i];
-    return `<tr style="--pc:${NEON.players[i]}"><td><span class="sw"></span>${p.name}${i === winner ? ' ★' : ''}</td><td>${st.captures}</td><td>${st.troopsKilled}</td><td>${st.troopsLost}</td><td>${st.peakTerritories}</td></tr>`;
+  showGameSummary(host, {
+    won: s.winnerIndex === me, winner: s.winnerIndex ?? 0, winnerName: s.players[s.winnerIndex ?? 0].name,
+    round: roundOfTurn(game.getEvents(), s.turnNumber, s.activePlayerIndex), territories: game.map.territories.length,
+    players: s.players.map((p, i) => ({ name: p.name, ...stats.players[i] })),
+  }, actions);
+}
+
+export function showGameSummary(host: HTMLElement, summary: {
+  won: boolean; winner: number; winnerName: string; round: number; territories: number;
+  players: { name: string; captures: number; troopsKilled: number; troopsLost: number; peakTerritories: number; eliminatedRound: number | null }[];
+}, actions: { onMenu(): void; onLog(): void }): void {
+  const { won, winner } = summary;
+  const rows = summary.players.map((p, i) => {
+    return `<tr style="--pc:${NEON.players[i]}"><td><span class="sw"></span>${escapeHtml(p.name)}${i === winner ? ' ★' : ''}</td><td>${p.captures}</td><td>${p.troopsKilled}</td><td>${p.troopsLost}</td><td>${p.peakTerritories}</td><td>${p.eliminatedRound ?? '—'}</td></tr>`;
   }).join('');
   const m = modal(host, `
     <div class="victory ${won ? 'won' : 'lost'}" style="--pc:${NEON.players[winner]}">
       <div class="v-kicker">${won ? 'DOMINION ACHIEVED' : 'GAME OVER'}</div>
-      <h2>${won ? 'VICTORY' : `${s.players[winner].name} WINS`}</h2>
-      <p>${stats.turns} turns · ${s.players.length} commanders · ${game.map.territories.length} territories</p>
+      <h2>${won ? 'YOU WIN' : `${escapeHtml(summary.winnerName)} WINS`}</h2>
+      <p>Round ${summary.round} · ${summary.players.length} commanders · ${summary.territories} territories</p>
     </div>
-    <table class="v-stats"><thead><tr><th></th><th>CAPT</th><th>KILLS</th><th>LOST</th><th>PEAK</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="v-stats"><thead><tr><th></th><th>CAPT</th><th>KILLS</th><th>LOST</th><th>PEAK</th><th title="Round eliminated" aria-label="Round eliminated">OUT</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="modal-actions"><button class="btn" id="v-log">EVENT LOG</button><button class="btn primary" id="v-menu">MENU</button></div>`);
   (m.querySelector('#v-log') as HTMLButtonElement).onclick = () => { m.remove(); actions.onLog(); };
   (m.querySelector('#v-menu') as HTMLButtonElement).onclick = () => { m.remove(); actions.onMenu(); };

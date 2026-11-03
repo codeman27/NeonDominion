@@ -22,7 +22,7 @@ export interface ReplayFrame {
  * Turns a resolved turn into a frame-by-frame replay. Pure: derived only from the state before the
  * turn and the engine's resolution logs, and the final frame is the engine's actual new state.
  */
-export function buildReplay(map: GameMap, before: GameState, result: TurnResolutionResult): ReplayFrame[] {
+export function buildReplay(map: GameMap, before: GameState, result: TurnResolutionResult, round = result.turnNumber): ReplayFrame[] {
   const name = (p: number) => before.players[p].name;
   const tn = (id: number) => map.territories[id].name;
   const owners = before.territories.map(t => t.owner);
@@ -31,7 +31,7 @@ export function buildReplay(map: GameMap, before: GameState, result: TurnResolut
   const frames: ReplayFrame[] = [];
   const r = result.reinforcements;
 
-  frames.push(snap({ caption: `${name(result.playerIndex)} · TURN ${result.turnNumber}`, sub: `+${r.total} troops${r.cardTradeBonus ? ` (cards +${r.cardTradeBonus})` : ''}`, weight: 1 }));
+  frames.push(snap({ caption: `${name(result.playerIndex)} · TURN ${round}`, sub: `+${r.total} troops${r.cardTradeBonus ? ` (cards +${r.cardTradeBonus})` : ''}`, weight: 1 }));
 
   for (const id of r.territoryMatchBonusTerritories) troops[id] += 2;
   for (const d of result.draftApplied) troops[d.territoryId] += d.troops;

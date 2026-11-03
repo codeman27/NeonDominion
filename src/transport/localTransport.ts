@@ -5,10 +5,15 @@ import { canonicalStringify, computeStateHash } from '../crypto/stateHash';
 import { GameRuleError } from '../engine/errors';
 import { MAP_GENERATOR_VERSION, generateMap } from '../engine/mapGenerator';
 import { applySetupPlacement, createGame } from '../engine/setup';
-import { applyTurn, validateTurnPlan, witnessFor } from '../engine/turnEngine';
-import type { SetupPlacementAction, TurnActionPlan, TurnResolutionResult } from '../types/actions';
-import type { GameMap, GameState, PlayerIndex } from '../types/game';
-import type { GameCreatePayload, GameEvent, GamePayload, TurnCommitPayload, TurnRevealPayload } from '../types/protocol';
+import { applyTurn, validateTurnPlan, witnessFor, tradeCards, computeReinforcements } from '../engine/turnEngine';
+import { DeterministicRng } from '../crypto/prng';
+import { resolveAttack } from '../engine/combatResolver';
+import { applyFortify } from '../engine/fortify';
+import { TERRITORY_MATCH_BONUS } from '../engine/rules';
+import { advanceCommitment } from '../crypto/hashChain';
+import type { InteractiveTurnState, FortifyOrder, FortifyResolution, SetupPlacementAction, TurnActionPlan, TurnResolutionResult, AttackCampaignOrder, InteractiveAttackResult, DraftPlacementOrder } from '../types/actions';
+import type { GameMap, GameState, PlayerIndex, TerritoryId } from '../types/game';
+import type { GameCreatePayload, GameEvent, GamePayload, InteractiveTurnStep, TurnCommitPayload, TurnRevealPayload } from '../types/protocol';
 import type { GameTransport, TurnOutcome } from './transport';
 
 /** Long enough for any realistic single-player game (each seat reveals only when it is witness). */
@@ -40,10 +45,19 @@ function makeEvent<P extends GamePayload>(author: string, seq: number, payload: 
  * commit → reveal → applyTurn pipeline and is recorded as text events (ARCHITECTURE §10).
  * In single player the client holds every chain, so this is about fidelity, not anti-cheat.
  */
+/** Tracks the in-progress interactive turn. */
+
 export class LocalGame implements GameTransport {
   readonly mode = 'LOCAL' as const;
   private events: GameEvent[] = [];
   private listeners = new Set<(o: TurnOutcome) => void>();
+  private interactiveTurn: {
+    before: GameState;
+    commit: GameEvent<TurnCommitPayload>;
+    secret: string;
+    witness: PlayerIndex;
+    steps: InteractiveTurnStep[];
+  } | null = null;
 
   private constructor(
     readonly map: GameMap,
@@ -174,6 +188,251 @@ export class LocalGame implements GameTransport {
     for (const cb of this.listeners) cb(outcome);
     return outcome;
   }
+
+  // ------------------------------------------------------------------ Interactive turn helpers
+  /**
+   * Commit the starting plan and consume the witness secret. The reveal is recorded at
+   * completion, together with the interactive decisions and the final state hash.
+   */
+  startInteractiveTurn(plan: TurnActionPlan): InteractiveTurnState {
+    const state = this.state;
+    if (!this.isLocalTurn() && !this.isBotTurn()) throw new GameRuleError('not a turn to start');
+    if (this.interactiveTurn) throw new GameRuleError('interactive turn already started');
+
+    const errors = validateTurnPlan(this.map, state, plan);
+    if (errors.length) throw new GameRuleError(errors.join('; '));
+
+    const commit = this.append(state.players[plan.playerIndex].id, {
+      kind: 'TURN_COMMIT', gameId: state.gameId, turnNumber: state.turnNumber, stateHash: computeStateHash(state), actionPlan: plan,
+    } satisfies TurnCommitPayload);
+
+    const witness = witnessFor(state);
+    const secret = this.cursors[witness].next();
+
+    return this.beginInteractiveTurn(plan, commit, secret);
+  }
+
+  private beginInteractiveTurn(plan: TurnActionPlan, commit: GameEvent<TurnCommitPayload>, secret: string): InteractiveTurnState {
+    const state = this.state;
+    const errors = validateTurnPlan(this.map, state, plan);
+    if (errors.length) throw new GameRuleError(errors.join('; '));
+    const witness = witnessFor(state);
+    this.interactiveTurn = { before: state, commit, secret, witness, steps: [] };
+
+    // Derive turn seed from commit event ID + revealed secret
+    const turnSeed = sha256Hex(commit.id + secret);
+
+    // Apply the starting plan before accepting interactive decisions.
+    let s = structuredClone(state);
+    s.players[witness].currentHashCommitment = advanceCommitment(state.players[witness].currentHashCommitment, secret);
+    s.players[witness].hashChainIndex++;
+
+    // 1. Card trades (+2 match troops are placed automatically on the matched territory).
+    const { trades } = tradeCards(state, plan);
+    const reinforcements = computeReinforcements(this.map, state, plan.playerIndex, trades);
+    const tradedIds = new Set(trades.flat().map(c => c.id));
+    s.discardPile.push(...s.players[plan.playerIndex].cards.filter(c => tradedIds.has(c.id)));
+    s.players[plan.playerIndex].cards = s.players[plan.playerIndex].cards.filter(c => !tradedIds.has(c.id));
+    for (const tid of reinforcements.matchTerritories) s.territories[tid].troops += TERRITORY_MATCH_BONUS;
+
+    // 2. Draft.
+    const draftApplied: DraftPlacementOrder[] = [];
+    for (const d of plan.draftPlacements) {
+      if (d.troops === 0) continue;
+      s.territories[d.territoryId].troops += d.troops;
+      draftApplied.push({ territoryId: d.territoryId, troops: d.troops });
+    }
+
+    // 3. Fortify (applied before interactive attacks so the map is in the final defensive position).
+    let fortify: FortifyResolution | null = null;
+    if (plan.fortify) {
+      const r = applyFortify(this.map, s, plan.playerIndex, plan.fortify);
+      s = r.state;
+      fortify = r.resolution;
+    }
+
+    const cloneState = structuredClone(s);
+
+    this.state = s;
+
+    return {
+      playerIndex: plan.playerIndex,
+      turnNumber: state.turnNumber,
+      turnSeed,
+      remainingAttacks: [...plan.attackQueue],
+      draftApplied,
+      reinforcements: { base: reinforcements.base, continentBonus: reinforcements.continentBonus, cardTradeBonus: reinforcements.cardTradeBonus, territoryMatchBonusTerritories: reinforcements.territoryMatchBonusTerritories, total: reinforcements.total },
+      cardDrawn: false,
+      conqueredAny: false,
+      attackLogs: [],
+      eliminatedPlayers: [],
+      fortify,
+      liveState: cloneState,
+      lastResult: null,
+    };
+  }
+
+  /** Execute one attack during the interactive turn. The attack is resolved against the live state. */
+  executeInteractiveAttack(state: InteractiveTurnState, order: AttackCampaignOrder): { result: InteractiveAttackResult; state: InteractiveTurnState } {
+    if (!this.interactiveTurn) throw new GameRuleError('no interactive turn started');
+    const workState: GameState = JSON.parse(canonicalStringify(state.liveState));
+
+    const attackIndex = state.attackLogs.length;
+    const rng = new DeterministicRng(sha256Hex(`${state.turnSeed}/dice/${attackIndex}`));
+
+    const log = resolveAttack(this.map, workState, state.playerIndex, order, () => rng.rollD6());
+    this.interactiveTurn.steps.push({ kind: 'ATTACK', order: structuredClone(order) });
+
+    // Remove the executed order from remaining attacks
+    const remainingAttacks = state.remainingAttacks.slice(1);
+
+    const nextState: InteractiveTurnState = {
+      ...state,
+      liveState: workState,
+      remainingAttacks,
+      conqueredAny: state.conqueredAny || log.conquered,
+      attackLogs: [...state.attackLogs, log],
+      eliminatedPlayers: log.eliminatedPlayerIndex === undefined ? state.eliminatedPlayers : [...state.eliminatedPlayers, log.eliminatedPlayerIndex],
+    };
+
+    return {
+      result: {
+        attack: log,
+        owners: workState.territories.map(t => t.owner),
+        troops: workState.territories.map(t => t.troops),
+        moreAttacks: remainingAttacks.length > 0,
+        turnComplete: false,
+      },
+      state: nextState,
+    };
+  }
+
+  /** Move troops from one territory to a conquered adjacent territory (post-attack move step). */
+  moveTroopsToConquered(state: InteractiveTurnState, from: TerritoryId, to: TerritoryId, count: number): { state: InteractiveTurnState } {
+    if (!this.interactiveTurn) throw new GameRuleError('no interactive turn started');
+    const workState: GameState = JSON.parse(canonicalStringify(state.liveState));
+
+    const src = workState.territories[from];
+    const dst = workState.territories[to];
+    if (!src || !dst) throw new GameRuleError('invalid territories');
+    if (src.owner !== state.playerIndex) throw new GameRuleError('source not owned');
+    const attack = state.attackLogs[state.attackLogs.length - 1];
+    if (!attack?.conquered || attack.fromTerritoryId !== from || attack.toTerritoryId !== to || dst.owner !== state.playerIndex || dst.troops !== 0) {
+      throw new GameRuleError('no pending conquest move');
+    }
+    const minMove = attack.waves[attack.waves.length - 1].attackerDice.length;
+    if (!Number.isInteger(count) || count < minMove) throw new GameRuleError(`must move at least ${minMove} troops`);
+    if (src.troops - 1 < count) throw new GameRuleError('not enough troops');
+
+    src.troops -= count;
+    dst.troops += count;
+    this.interactiveTurn.steps.push({ kind: 'MOVE', from, to, troops: count });
+
+    return {
+      state: {
+        ...state,
+        liveState: workState,
+      },
+    };
+  }
+
+  /** Apply the fortify step of the interactive turn. */
+  executeInteractiveFortify(state: InteractiveTurnState, order: FortifyOrder): { state: InteractiveTurnState } {
+    if (!this.interactiveTurn) throw new GameRuleError('no interactive turn started');
+    const workState: GameState = JSON.parse(canonicalStringify(state.liveState));
+
+    const { state: resolvedState, resolution } = applyFortify(this.map, workState, state.playerIndex, order);
+    this.interactiveTurn.steps.push({ kind: 'FORTIFY', order: structuredClone(order) });
+
+    return {
+      state: {
+        ...state,
+        liveState: resolvedState,
+        fortify: { ...resolution, order },
+      },
+    };
+  }
+
+  private completeInteractiveTurn(state: InteractiveTurnState): TurnResolutionResult {
+    if (!this.interactiveTurn) throw new GameRuleError('no interactive turn started');
+    // Apply the interactive turn state to the real game state
+    this.state = state.liveState;
+
+    // Same card-draw rule as applyTurn: one real deck card for conquering at least one territory.
+    let cardDrawn = state.cardDrawn;
+    const won = this.state.territories.every(t => t.owner === state.playerIndex);
+    if (!cardDrawn && state.conqueredAny && !won) {
+      if (this.state.deck.length === 0 && this.state.discardPile.length > 0) {
+        this.state.deck = new DeterministicRng(state.turnSeed).fork('reshuffle').shuffle(this.state.discardPile.sort((a, b) => a.id - b.id));
+        this.state.discardPile = [];
+      }
+      const card = this.state.deck.pop();
+      if (card) { this.state.players[state.playerIndex].cards.push(card); cardDrawn = true; }
+    }
+
+    // Check for win condition
+    if (won) {
+      this.state.winnerIndex = state.playerIndex;
+      this.state.phase = 'GAME_OVER';
+    } else {
+      const n = this.state.players.length;
+      for (let step = 1; step <= n; step++) {
+        const i = (state.playerIndex + step) % n;
+        if (!this.state.players[i].eliminated) {
+          this.state.activePlayerIndex = i;
+          break;
+        }
+      }
+      this.state.turnNumber = state.turnNumber + 1;
+      this.state.phase = 'ACTIVE_TURN_COMMIT';
+    }
+
+    this.state.lastCommitEventId = this.interactiveTurn.commit.id;
+    this.state.lastRevealEventId = null;
+    this.state.prevStateHash = computeStateHash(this.interactiveTurn.before);
+
+    return {
+      turnNumber: state.turnNumber,
+      playerIndex: state.playerIndex,
+      turnSeed: state.turnSeed,
+      newState: this.state,
+      newStateHash: computeStateHash(this.state),
+      reinforcements: state.reinforcements,
+      eliminatedPlayers: state.eliminatedPlayers,
+      cardDrawn,
+      attackLogs: state.attackLogs,
+      fortify: state.fortify,
+      draftApplied: state.draftApplied,
+    };
+  }
+
+  /** Finish once, recording the complete turn so replay, saves and statistics agree. */
+  finishInteractiveTurn(state: InteractiveTurnState): TurnOutcome {
+    const resolution = this.completeInteractiveTurn(state);
+    const { commit, secret, witness, steps } = this.interactiveTurn!;
+    const reveal = this.append(this.state.players[witness].id, {
+      kind: 'TURN_REVEAL', gameId: this.state.gameId, turnNumber: state.turnNumber,
+      witnessIndex: witness, commitEventId: commit.id, revealedSecret: secret,
+      expectedNewStateHash: resolution.newStateHash, interactiveSteps: steps,
+    });
+    this.interactiveTurn = null;
+    const outcome = { commit, reveal, resolution };
+    for (const cb of this.listeners) cb(outcome);
+    return outcome;
+  }
+
+  /** Re-execute local interactive decisions using the same rules as live play. */
+  static replayInteractiveTurn(map: GameMap, state: GameState, commit: GameEvent<TurnCommitPayload>, reveal: TurnRevealPayload): TurnResolutionResult {
+    const game = new LocalGame(map, state, [], commit.payload.actionPlan.playerIndex);
+    let turn = game.beginInteractiveTurn(commit.payload.actionPlan, commit, reveal.revealedSecret);
+    for (const step of reveal.interactiveSteps ?? []) {
+      if (step.kind === 'ATTACK') turn = game.executeInteractiveAttack(turn, step.order).state;
+      else if (step.kind === 'MOVE') turn = game.moveTroopsToConquered(turn, step.from, step.to, step.troops).state;
+      else if (step.kind === 'FORTIFY') turn = game.executeInteractiveFortify(turn, step.order).state;
+      else throw new GameRuleError('unknown interactive step');
+    }
+    return game.completeInteractiveTurn(turn);
+  }
 }
 
 /**
@@ -209,7 +468,9 @@ export function replayEventLog(json: string, onTurn?: (result: TurnResolutionRes
       const witness = witnessFor(state);
       if (r.payload.commitEventId !== e.id) fail(i + 1, 'reveal references a different commit');
       if (r.payload.witnessIndex !== witness || r.author !== state.players[witness].id) fail(i + 1, 'reveal from the wrong witness');
-      const result = applyTurn(map, state, { plan: p.actionPlan, commitEventId: e.id, revealedSecret: r.payload.revealedSecret });
+      const result = r.payload.interactiveSteps !== undefined
+        ? LocalGame.replayInteractiveTurn(map, state, { ...e, payload: p }, r.payload)
+        : applyTurn(map, state, { plan: p.actionPlan, commitEventId: e.id, revealedSecret: r.payload.revealedSecret });
       if (result.newStateHash !== r.payload.expectedNewStateHash) fail(i + 1, 'state hash mismatch');
       onTurn?.(result, state);
       state = result.newState;
