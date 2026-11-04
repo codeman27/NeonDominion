@@ -38,8 +38,22 @@ jobs:
           aws s3 sync dist/assets "s3://${{ secrets.SITE_BUCKET }}/assets"
           --delete --cache-control "public, max-age=31536000, immutable"
       - name: Upload site files
+        env:
+          SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
         run: >
-          aws s3 sync dist "s3://${{ secrets.SITE_BUCKET }}"
-          --delete --exclude "assets/*" --cache-control "no-cache"
+          aws s3 sync dist/ "s3://${SITE_BUCKET}"
+          --delete
+          --exclude "assets/*"
+          --cache-control "no-cache"
+      - name: Set manifest content type
+        env:
+          SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
+        run: >
+          aws s3 cp dist/manifest.webmanifest
+          "s3://${SITE_BUCKET}/manifest.webmanifest"
+          --content-type "application/manifest+json"
+          --cache-control "no-cache"
       - name: Invalidate CloudFront
-        run: aws cloudfront create-invalidation --distribution-id "${{ secrets.DISTRIBUTION_ID }}" --paths "/*"
+        env:
+          DISTRIBUTION_ID: ${{ secrets.DISTRIBUTION_ID }}
+        run: aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
