@@ -6,7 +6,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE);
-      await cache.addAll(["./", "./index.html", "./manifest.webmanifest", "./favicon.svg", "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png"]);
+      await cache.addAll(["./", "./index.html", "./manifest.webmanifest", "./favicon.svg", "./icons/icon.svg?v=2", "./icons/icon-192.png?v=2", "./icons/icon-512.png?v=2"]);
       // Cache the hashed build assets (and the fonts the CSS references) so the first visit works offline.
       const html = await (await fetch("./")).text();
       const assets = [...html.matchAll(/(?:src|href)="\.?\/?(assets\/[^"]+)"/g)].map((m) => new URL(m[1], self.registration.scope).href);
