@@ -9,7 +9,8 @@ export default defineConfig({
       manifest: {
         name: 'Neon Dominion',
         short_name: 'Neon Dominion',
-        start_url: '/',
+        start_url: './',
+        scope: './',
         display: 'fullscreen',
         display_override: ['minimal-ui'],
         background_color: '#07010f',
@@ -17,13 +18,13 @@ export default defineConfig({
         orientation: 'any',
         icons: [
           {
-            src: '/icon-192.png',
+            src: 'icon-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icon-512.png',
+            src: 'icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',
