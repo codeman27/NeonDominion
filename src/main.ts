@@ -6,3 +6,12 @@ import './ui/styles/base.css';
 import { startApp } from './ui/app';
 
 startApp(document.getElementById('app')!);
+
+// Register the custom service worker for offline support.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Vite PWA plugin will handle registration; fall back gracefully.
+    });
+  });
+}
