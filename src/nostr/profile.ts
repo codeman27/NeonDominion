@@ -3,6 +3,8 @@ import { sha256Hex } from '../crypto/prng';
 
 const ADJECTIVES = ['Neon', 'Chrome', 'Cosmic', 'Solar', 'Silent', 'Electric', 'Lunar', 'Crimson', 'Arctic', 'Golden', 'Iron', 'Silver', 'Violet', 'Quantum', 'Emerald', 'Radiant'];
 const NOUNS = ['Falcon', 'Fox', 'Raven', 'Wolf', 'Tiger', 'Comet', 'Phoenix', 'Lynx', 'Dragon', 'Panther', 'Owl', 'Viper', 'Orion', 'Puma', 'Hawk', 'Nova'];
+const GAME_ADJECTIVES = ['Blue', 'Red', 'Golden', 'Crimson', 'Arctic', 'Emerald', 'Silver', 'Amber', 'Silent', 'Shattered', 'Hidden', 'Frozen', 'Burning', 'Distant', 'Violet', 'Iron'];
+const GAME_NOUNS = ['Storm', 'Rising', 'Tide', 'Frontier', 'Horizon', 'Summit', 'Valley', 'Islands', 'Highlands', 'Coast', 'Canyon', 'Basin', 'Ridge', 'Expanse', 'Crossing', 'Dominion'];
 export const MAX_DISPLAY_NAME_LENGTH = 32;
 
 export function commanderLabel(pubkey: string, gameName: string, account?: { pubkey: string; name: string }): string {
@@ -19,6 +21,13 @@ export function generatedName(pubkey: string): string {
   profileKey(pubkey);
   const hash = sha256Hex(`neon-dominion-name-v1:${pubkey}`);
   return `${ADJECTIVES[parseInt(hash.slice(0, 1), 16)]} ${NOUNS[parseInt(hash.slice(1, 2), 16)]} ${parseInt(hash.slice(2, 6), 16).toString().padStart(5, '0')}`;
+}
+
+/** A stable label for the randomly identified game, shared before its map is generated. */
+export function generatedGameName(gameId: string): string {
+  if (!isHex32(gameId)) throw new Error('Invalid game identity for game name.');
+  const hash = sha256Hex(`neon-dominion-game-name-v1:${gameId}`);
+  return `${GAME_ADJECTIVES[parseInt(hash.slice(0, 1), 16)]} ${GAME_NOUNS[parseInt(hash.slice(1, 2), 16)]}`;
 }
 
 export function normalizeDisplayName(value: string): string {

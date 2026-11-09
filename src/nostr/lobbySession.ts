@@ -16,7 +16,7 @@ import { witnessFor } from '../engine/turnEngine';
 import { BEACON_CHAIN, beaconRandomness, beaconTime, fetchBeacon, futureBeaconRound, type BeaconProof } from './beacon';
 import {
   deriveLobby, LOBBY_KIND, MAX_GAME_HISTORY, lobbyTemplate, normalizeRelays, parseLobbyEvent,
-  type LobbyInvite, type LobbyPayload, type LobbyRecord, type LobbyState,
+  type InvitedFriend, type LobbyInvite, type LobbyPayload, type LobbyRecord, type LobbyState,
 } from './lobbyProtocol';
 
 export interface PublishResult { accepted: number; total: number; failures: string[] }
@@ -294,6 +294,9 @@ export class LobbySession {
   async requestJoin(displayName: string, active = true): Promise<void> {
     this.assertAction();
     if (this.identity.pubkey === this.invite.host) throw new Error('The host already has a seat.');
+    if (this.state.creation?.invited && !this.state.creation.invited.some(f => f.pubkey === this.identity.pubkey)) {
+      throw new Error('Only friends explicitly invited by the host can join this game.');
+    }
     const last = this.state.requests.get(this.identity.pubkey);
     if (last?.payload.type === 'request' && last.payload.active === active) throw new Error(active ? 'Your join request is already active.' : 'You already left this lobby.');
     await this.send({
@@ -672,13 +675,16 @@ export class LobbySession {
 
 export async function createLobby(
   identity: NostrIdentity, name: string, maxPlayers: number, relayURLs: string[], wire: LobbyWire = new RelayLobbyWire(),
+  invited?: InvitedFriend[],
 ): Promise<LobbySession> {
   const relays = normalizeRelays(relayURLs);
   if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8) throw new Error('Choose 2–8 players.');
   const event = await identity.signEvent(lobbyTemplate({
     v: 1, type: 'create', name: normalizeDisplayName(name), maxPlayers, relays,
     nonce: bytesToHex(crypto.getRandomValues(new Uint8Array(32))),
+    ...(invited ? { invited } : {}),
   }));
+  parseLobbyEvent(event, { v: 1, id: event.id, host: identity.pubkey, relays });
   const session = new LobbySession(identity, { v: 1, id: event.id, host: identity.pubkey, relays }, wire);
   // Keep the exact signed creation for retries even if an acknowledgment is lost.
   session.receive(event);

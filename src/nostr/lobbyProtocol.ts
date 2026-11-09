@@ -5,6 +5,7 @@ import { normalizeURL } from 'nostr-tools/utils';
 import { MAP_GENERATOR_VERSION } from '../engine/mapGenerator';
 import { parseSetupPayload, type SetupPayload } from './setupProtocol';
 import { parsePlayPayload, type PlayPayload } from './playProtocol';
+import { deriveFriends, parseFriend } from './friendsProtocol';
 
 export const LOBBY_KIND = 1042;
 export const MAX_GAME_HISTORY = 250000;
@@ -12,7 +13,8 @@ export const LOBBY_TOPIC = 'neon-dominion-lobby-v1';
 export const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
 export interface LobbyInvite { v: 1; id: string; host: string; relays: string[] }
 export interface LobbyMember { pubkey: string; name: string; request: string }
-export interface CreateLobby { v: 1; type: 'create'; name: string; maxPlayers: number; relays: string[]; nonce: string }
+export interface InvitedFriend { pubkey: string; proof: Event[] }
+export interface CreateLobby { v: 1; type: 'create'; name: string; maxPlayers: number; relays: string[]; nonce: string; invited?: InvitedFriend[] }
 export interface LobbyRequest { v: 1; type: 'request'; name: string; active: boolean; seq: number; prev: string }
 export interface LobbyRoster { v: 1; type: 'roster'; members: LobbyMember[]; closed: boolean; seq: number; prev: string }
 export interface LobbyStart { v: 1; type: 'start'; members: LobbyMember[]; mapGeneratorVersion: number; seq: number; prev: string }
@@ -75,9 +77,22 @@ export function decodeInvite(input: string): LobbyInvite {
 export function lobbyTemplate(payload: LobbyPayload, gameId?: string): EventTemplate {
   return {
     kind: LOBBY_KIND, created_at: Math.floor(Date.now() / 1000),
-    tags: [['t', LOBBY_TOPIC], ...(gameId ? [['e', gameId]] : [])],
+    tags: [['t', LOBBY_TOPIC], ...(gameId ? [['e', gameId]] : []),
+      ...(payload.type === 'create' ? (payload.invited ?? []).map(friend => ['p', friend.pubkey]) : [])],
     content: JSON.stringify(payload),
   };
+}
+
+export function parseGameInvitation(event: Event, recipient: string): { invite: LobbyInvite; creation: CreateLobby } {
+  const value: unknown = JSON.parse(event.content);
+  if (!object(value) || !Array.isArray(value.relays)
+    || !value.relays.every((r): r is string => typeof r === 'string')) throw new Error('Invalid game invitation.');
+  const invite: LobbyInvite = { v: 1, id: event.id, host: event.pubkey, relays: normalizeRelays(value.relays) };
+  const record = parseLobbyEvent(event, invite);
+  if (record.payload.type !== 'create' || !record.payload.invited?.some(f => f.pubkey === recipient)) {
+    throw new Error('This game invitation is not addressed to your account.');
+  }
+  return { invite, creation: record.payload };
 }
 
 /** Reconstruct the event so a library verification-cache symbol cannot bypass validation. */
@@ -92,19 +107,42 @@ export function parseLobbyEvent(input: unknown, invite: LobbyInvite): LobbyRecor
     id: input.id, pubkey: input.pubkey, sig: input.sig, kind: input.kind,
     created_at: input.created_at, tags: structuredClone(input.tags), content: input.content,
   };
-  if (event.kind !== LOBBY_KIND || event.content.length > 8192 || !verifyEvent(event)
+  if (event.kind !== LOBBY_KIND || event.content.length > 32768 || !verifyEvent(event)
     || !event.tags.some(t => t.length === 2 && t[0] === 't' && t[1] === LOBBY_TOPIC)) {
     throw new Error('Invalid lobby signature, kind or topic.');
   }
   const p: unknown = JSON.parse(event.content);
   if (!object(p) || p.v !== 1) throw new Error('Unsupported lobby message.');
+  if (p.type !== 'create' && event.content.length > 8192) throw new Error('Lobby message exceeds the size limit.');
   if (p.type === 'create') {
     if (event.id !== invite.id || event.pubkey !== invite.host || !name(p.name)
       || typeof p.maxPlayers !== 'number' || !Number.isInteger(p.maxPlayers) || p.maxPlayers < 2 || p.maxPlayers > 8
       || typeof p.nonce !== 'string' || !isHex32(p.nonce) || !Array.isArray(p.relays)
       || !p.relays.every((r): r is string => typeof r === 'string')
       || JSON.stringify(normalizeRelays(p.relays)) !== JSON.stringify(invite.relays)) throw new Error('Invalid lobby creation or invite mismatch.');
-    return { event, payload: { v: 1, type: 'create', name: p.name, maxPlayers: p.maxPlayers, nonce: p.nonce, relays: invite.relays } };
+    let invited: InvitedFriend[] | undefined;
+    if ('invited' in p) {
+      if (!Array.isArray(p.invited) || p.invited.length < 1 || p.invited.length >= p.maxPlayers) {
+        throw new Error('Invite 1–7 friends within the lobby capacity.');
+      }
+      invited = p.invited.map(value => {
+        if (!object(value) || typeof value.pubkey !== 'string' || !isHex32(value.pubkey)
+          || value.pubkey === invite.host || !Array.isArray(value.proof) || value.proof.length !== 2) {
+          throw new Error('Invalid invited friend.');
+        }
+        const proof = value.proof.map(event => parseFriend(event));
+        if (!proof.every(r => (r.event.pubkey === invite.host && r.peer === value.pubkey)
+          || (r.event.pubkey === value.pubkey && r.peer === invite.host))
+          || !deriveFriends(invite.host, proof).some(e => e.pubkey === value.pubkey && e.state === 'friends')) {
+          throw new Error('An invitation requires mutual signed friendship.');
+        }
+        return { pubkey: value.pubkey, proof: proof.map(r => r.event) };
+      });
+      if (new Set(invited.map(f => f.pubkey)).size !== invited.length
+        || JSON.stringify(event.tags.filter(t => t[0] === 'p').map(t => t[1]).sort())
+          !== JSON.stringify(invited.map(f => f.pubkey).sort())) throw new Error('Invalid invitation recipients.');
+    }
+    return { event, payload: { v: 1, type: 'create', name: p.name, maxPlayers: p.maxPlayers, nonce: p.nonce, relays: invite.relays, ...(invited ? { invited } : {}) } };
   }
   if (!event.tags.some(t => t.length === 2 && t[0] === 'e' && t[1] === invite.id)) throw new Error('Invalid lobby reference.');
   const setup = parseSetupPayload(p);
@@ -140,7 +178,9 @@ export function deriveLobby(invite: LobbyInvite, records: readonly LobbyRecord[]
   const state: LobbyState = { creation, members: [], pending: [], requests: new Map(), roster: null, start: null, closed: false, conflict: null, warnings: [] };
   if (!creation) return state;
   const validRequests = new Map<string, LobbyRecord>();
-  const authors = [...new Set(records.filter(r => r.payload.type === 'request').map(r => r.event.pubkey))].sort();
+  const allowed = creation.invited ? new Set(creation.invited.map(f => f.pubkey)) : null;
+  const authors = [...new Set(records.filter(r => r.payload.type === 'request'
+    && (!allowed || allowed.has(r.event.pubkey))).map(r => r.event.pubkey))].sort();
   for (const author of authors) {
     let prev = invite.id;
     for (let seq = 1; ; seq++) {
@@ -172,14 +212,15 @@ export function deriveLobby(invite: LobbyInvite, records: readonly LobbyRecord[]
     }
     if (!current.payload.members.every(m => {
       const request = validRequests.get(m.request);
-      return request?.event.pubkey === m.pubkey && request.payload.type === 'request' && request.payload.active && request.payload.name === m.name;
+      return (!allowed || allowed.has(m.pubkey)) && request?.event.pubkey === m.pubkey
+        && request.payload.type === 'request' && request.payload.active && request.payload.name === m.name;
     })) {
       state.warnings.push('Waiting for signed join requests referenced by the host roster. Reconnect if history is incomplete.');
       break;
     }
     if (current.payload.type === 'start') {
       const approved = state.roster?.payload;
-      if (!current.payload.members.every(m => approved?.type === 'roster'
+      if (!allowed && !current.payload.members.every(m => approved?.type === 'roster'
         && approved.members.some(a => a.pubkey === m.pubkey && a.request === m.request && a.name === m.name))) {
         state.conflict = 'The host attempted to start with unapproved commanders.'; return state;
       }
@@ -190,7 +231,12 @@ export function deriveLobby(invite: LobbyInvite, records: readonly LobbyRecord[]
     prev = current.event.id;
     if (current.payload.closed) { state.closed = true; break; }
   }
+  const automatic = [...state.requests.values()]
+    .filter(r => r.payload.type === 'request' && r.payload.active)
+    .map(r => ({ pubkey: r.event.pubkey, name: r.payload.type === 'request' ? r.payload.name : '', request: r.event.id }))
+    .sort((a, b) => a.pubkey.localeCompare(b.pubkey));
   const accepted = state.start?.payload.type === 'start' ? state.start.payload.members
+    : allowed ? automatic
     : state.roster?.payload.type === 'roster' ? state.roster.payload.members : [];
   state.members = [{ pubkey: invite.host, name: creation.name, request: invite.id }, ...accepted.filter(m => {
     if (state.start) return true;

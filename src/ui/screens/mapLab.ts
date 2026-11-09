@@ -26,7 +26,6 @@ export function mountMapLab(root: HTMLElement): () => void {
     players: Math.min(8, Math.max(2, Number(params.get('p')) || 4)),
     seed: params.get('seed') || randomSeed(),
     selected: null as number | null,
-    rotated: false,
     report: null as MapGenReport | null,
     ms: 0,
     showOwners: false,
@@ -48,7 +47,6 @@ export function mountMapLab(root: HTMLElement): () => void {
 
   function draw(refit: boolean): void {
     const map = state.report!.map;
-    const rotate = board.clientHeight > board.clientWidth * 1.1;
     // When showOwners is on, simulate random territory assignment for 4 players
     let owners: number[] | undefined;
     let colorMode: 'continent' | 'owner' = 'continent';
@@ -65,15 +63,14 @@ export function mountMapLab(root: HTMLElement): () => void {
     const box = renderMap(svg, map, {
       colorMode,
       owners,
-      rotate,
+      rotate: true,
       continentLabels: true,
       selected: state.selected,
     });
     if (state.selected !== null) {
       for (const n of map.territories[state.selected].neighbors) svg.querySelector(`.terr[data-t="${n}"]`)?.classList.add('neighbor');
     }
-    camera.setFitBox(box, refit || rotate !== state.rotated);
-    state.rotated = rotate;
+    camera.setFitBox(box, refit);
   }
 
   function onTap(target: Element): void {

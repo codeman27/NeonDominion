@@ -56,7 +56,7 @@ export function mountMultiplayerBoard(
   let trades: CardTradeOrder[] = [], fortify: FortifyOrder | null = null, fSource = -1, moveTroops = 1, step = 1;
   let stopAt: number | null = null, resultsOpen = false;
   const draft = new Map<number, number>();
-  let rotate = innerHeight > innerWidth * 1.1, refit = true, watching = false;
+  let refit = true, watching = false;
   let serviceTimer: ReturnType<typeof setTimeout> | null = null;
   let serviceBusy = false, serviceFailed = false, recoveredIndex = '';
   const serviceAbort = new AbortController();
@@ -125,7 +125,7 @@ export function mountMultiplayerBoard(
       : fortifying && fortify ? [{ from: fortify.fromTerritoryId, to: fortify.toTerritoryId, kind: 'fortify', label: 'F' }]
         : source >= 0 && target >= 0 ? [{ from: source, to: target, kind: 'attack', label: '!' }] : [];
     camera.setFitBox(renderMap(svg, map, {
-      colorMode: 'owner', owners: snap.state.territories.map(t => t.owner), troops, rotate,
+      colorMode: 'owner', owners: snap.state.territories.map(t => t.owner), troops, rotate: true,
       selected: selected !== null && selected >= 0 ? selected : null, highlight,
       boosted: new Set(draft.keys()), arrows,
       myTerritories: mine && (drafting || snap.phase === 'attack' && source < 0 && !fortifying)
@@ -310,7 +310,7 @@ export function mountMultiplayerBoard(
     const url = URL.createObjectURL(new Blob([JSON.stringify([...session.records.values()].map(r => r.event), null, 2)], { type: 'application/json' }));
     const link = document.createElement('a'); link.href = url; link.download = `neon-dominion-game-${session.invite.id.slice(0, 8)}.json`; link.click(); URL.revokeObjectURL(url);
   };
-  const resize = () => { const next = innerHeight > innerWidth * 1.1; if (next !== rotate) { rotate = next; refit = true; draw(); } };
+  const resize = () => { refit = true; draw(); };
   const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && q('#mp-drawer').classList.contains('open')) q('#mp-close-intel').click(); };
   window.addEventListener('resize', resize); window.addEventListener('keydown', onKey);
   return {

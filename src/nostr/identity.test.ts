@@ -15,6 +15,19 @@ function memoryStorage() {
 }
 
 describe('Nostr identity', () => {
+  it('exports device-account backups that restore the exact signing identity without serializing secrets', async () => {
+    const storage = memoryStorage();
+    const guest = connectGuest(storage);
+    expect(guest.exportNsec).toBeTypeOf('function');
+    const backup = guest.exportNsec!();
+    const imported = connectNsec(backup);
+    expect(imported.pubkey).toBe(guest.pubkey);
+    expect(verifyEvent(await imported.signEvent(template))).toBe(true);
+    expect(restoreGuest(storage)?.exportNsec?.()).toBe(backup);
+    expect(JSON.stringify(guest)).not.toContain(backup);
+    expect(JSON.stringify(guest)).not.toContain(storage.getItem('nd.nostr.guest.v1'));
+    expect(imported.exportNsec).toBeUndefined();
+  });
   it('restores an existing guest without generating or rewriting keys, including pre-preference saves', () => {
     const storage = memoryStorage();
     expect(restoreGuest(storage)).toBeNull();
@@ -99,6 +112,7 @@ describe('Nostr identity', () => {
       signEvent: async event => finalizeEvent(event, secret),
     });
     expect(identity.source).toBe('extension');
+    expect(identity.exportNsec).toBeUndefined();
     expect(verifyEvent(await identity.signEvent(template))).toBe(true);
   });
 

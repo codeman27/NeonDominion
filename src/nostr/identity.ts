@@ -1,7 +1,7 @@
 import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent, type Event, type EventTemplate } from 'nostr-tools/pure';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { isHex32 } from '../crypto/hashChain';
-import { decode } from 'nostr-tools/nip19';
+import { decode, nsecEncode } from 'nostr-tools/nip19';
 
 const GUEST_KEY = 'nd.nostr.guest.v1';
 const LOGIN_KEY = 'nd.nostr.login.v1';
@@ -15,6 +15,7 @@ export interface NostrIdentity {
   readonly pubkey: string;
   readonly source: 'extension' | 'guest' | 'nsec';
   signEvent(event: EventTemplate): Promise<Event>;
+  exportNsec?(): string;
 }
 
 export function browserExtension(): NostrExtension | undefined {
@@ -59,7 +60,7 @@ export async function connectExtension(provider: NostrExtension | undefined): Pr
   };
 }
 
-/** Dedicated low-value game identity. Its private key never leaves this browser. */
+/** Dedicated low-value game identity. Export happens only through an explicit backup action. */
 export function connectGuest(storage: Pick<Storage, 'getItem' | 'setItem'>): NostrIdentity {
   const saved = storage.getItem(GUEST_KEY);
   if (saved !== null && !isHex32(saved)) throw new Error('The saved guest identity is invalid. Clear it explicitly before creating another.');
@@ -69,6 +70,7 @@ export function connectGuest(storage: Pick<Storage, 'getItem' | 'setItem'>): Nos
   return {
     pubkey,
     source: 'guest',
+    exportNsec: () => nsecEncode(secret),
     signEvent: event => signChecked(pubkey, event, async e => finalizeEvent(e, secret)),
   };
 }

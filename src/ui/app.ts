@@ -6,6 +6,7 @@ import { mountMapLab } from './screens/mapLab';
 import { mountNostrMenu } from './screens/nostrMenu';
 import type { NostrIdentity } from '../nostr/identity';
 import { mountNostrLobby } from './screens/nostrLobby';
+import { mountFriendsScreen } from './screens/friendsScreen';
 
 type Unmount = () => void;
 
@@ -24,7 +25,8 @@ export function startApp(root: HTMLElement): void {
       identity,
       onIdentity: connected => { identity = connected; },
       onSolo: showMenu,
-      onLobby: (connected, name, mode, gameId) => swap(() => mountNostrLobby(root, { identity: connected, name, mode, gameId, onBack: showNostr })),
+      onFriends: (connected, name) => swap(() => mountFriendsScreen(root, { identity: connected, name, onBack: showNostr })),
+      onLobby: (connected, name, mode, gameId, invitation) => swap(() => mountNostrLobby(root, { identity: connected, name, mode, gameId, invitation, onBack: showNostr })),
     }));
   const showMenu = () => swap(() => mountMainMenu(root, {
     onNostr: showNostr,

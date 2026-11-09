@@ -35,7 +35,6 @@ export function mountMultiplayerSetup(
   let step = 1;
   let baseHash: string | null = null;
   let blocked = true;
-  let rotate = innerHeight > innerWidth * 1.1;
   let refit = false;
   let alive = true, preparing = false, preparationFailed = false;
   let prepareTimer: ReturnType<typeof setTimeout> | null = null;
@@ -73,7 +72,7 @@ export function mountMultiplayerSetup(
     const troops = s.setup.state.territories.map((t, id) => t.troops + (!submitted ? draft.get(id) ?? 0 : 0));
     const box = renderMap(svg, s.setup.map, {
       colorMode: 'owner', owners: s.setup.base.territories.map(t => t.owner), troops,
-      rotate,
+      rotate: true,
       myTerritories: new Set(s.setup.base.territories.flatMap((t, i) => t.owner === seat ? [i] : [])),
       boosted: new Set(submitted ? [] : draft.keys()),
     });
@@ -126,9 +125,6 @@ export function mountMultiplayerSetup(
   q('#ms-drawer').onclick = event => { if (event.target === q('#ms-drawer')) q('#ms-close-intel').click(); };
   q('#ms-fit').onclick = () => camera.fit();
   const resize = () => {
-    const next = innerHeight > innerWidth * 1.1;
-    if (next === rotate) return;
-    rotate = next;
     refit = true;
     draw();
   };

@@ -1,8 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { commanderLabel, generatedName, loadDisplayName, normalizeDisplayName, resetDisplayName, saveDisplayName } from './profile';
+import { commanderLabel, generatedGameName, generatedName, loadDisplayName, normalizeDisplayName, resetDisplayName, saveDisplayName } from './profile';
 
 const first = 'ab'.repeat(32);
 const second = 'cd'.repeat(32);
+
+describe('multiplayer game names', () => {
+  it('generates stable two-word names without numbers for every viewer', () => {
+    expect(generatedGameName(first)).toBe(generatedGameName(first));
+    expect(generatedGameName(first)).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
+    expect(generatedGameName(first)).not.toBe(generatedGameName(second));
+    expect(() => generatedGameName('bad')).toThrow('Invalid game identity');
+  });
+
+  it('varies both words across game identities', () => {
+    const names = Array.from({ length: 256 }, (_, i) => generatedGameName(i.toString(16).padStart(64, '0')));
+    expect(new Set(names.map(name => name.split(' ')[0])).size).toBe(16);
+    expect(new Set(names.map(name => name.split(' ')[1])).size).toBe(16);
+    expect(new Set(names).size).toBeGreaterThan(100);
+  });
+});
 
 describe('commander names', () => {
   it('uses the saved account label only for that identity without rewriting game names', () => {

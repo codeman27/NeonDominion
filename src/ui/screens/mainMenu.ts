@@ -38,7 +38,7 @@ export function mountMainMenu(root: HTMLElement, opts: MenuOptions): () => void 
     q('#pc-dots').innerHTML = Array.from({ length: state.players }, (_, i) =>
       `<span class="${i ? '' : 'you'}" style="--pc:${NEON.players[i]}">${i ? 'BOT' : 'YOU'}</span>`).join('');
     const map = generateMap({ seed: state.seed, playerCount: state.players });
-    renderMap(q('#preview') as unknown as SVGSVGElement, map, { colorMode: 'continent', preview: true });
+    renderMap(q('#preview') as unknown as SVGSVGElement, map, { colorMode: 'continent', preview: true, rotate: true });
     const lanes = map.chokepoints.filter(c => c.kind === 'SEA_LANE').length;
     q('#m-stats').innerHTML = `<b>${map.territories.length}</b> territories · <b>${map.continents.length}</b> continents · <b>${lanes}</b> sea lane${lanes === 1 ? '' : 's'}
       <br><b>${MAP_SCALE[state.players].territories / state.players}</b> territories each`;

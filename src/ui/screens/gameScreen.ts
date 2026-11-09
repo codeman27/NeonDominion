@@ -64,7 +64,6 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
     draft: new Map<TerritoryId, number>(),
     attacks: [] as PlannedAttack[],
     fortify: null as FortifyOrder | null,
-    rotated: false,
     log: [] as string[],
     alive: true,
     frame: null as ReplayFrame | null,
@@ -176,9 +175,6 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
 
   /* ------------------------------ rendering ------------------------------ */
   function draw(refit = false): void {
-    // Panel height changes must not rotate the map between phases.
-    const viewport = q('.game');
-    const portrait = viewport.clientHeight > viewport.clientWidth * 1.1;
     const f = ui.frame;
     let arrows: MapArrow[] = [];
     if (ui.phase === 'attack') {
@@ -211,12 +207,11 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
       colorMode: 'owner',
       owners: f ? f.owners : (ui.interactive ? ui.interactive.state.liveState.territories.map(t => t.owner) : S().territories.map(t => t.owner)),
       troops: f ? f.troops : (ui.interactive ? ui.interactive.state.liveState.territories.map(t => t.troops) : projectedTroops()),
-      rotate: portrait,
+      rotate: true,
       selected: f ? null : ui.sel, highlight: f ? null : validTargets(), boosted, arrows,
       debugSel: ui.sel, myTerritories,
     });
-    camera.setFitBox(box, refit || portrait !== ui.rotated);
-    ui.rotated = portrait;
+    camera.setFitBox(box, refit);
 
     // Debug overlay for valid targets
     const dbg = q('#debug-overlay');
@@ -734,7 +729,7 @@ export function mountGameScreen(root: HTMLElement, game: LocalGame, opts: GameSc
       if (ui.skip || !ui.alive) break;
       ui.frame = f;
       draw();
-      if (followBot && f.focus?.length) camera.focusOn(f.focus.map(id => territoryPoint(map, id, ui.rotated)));
+      if (followBot && f.focus?.length) camera.focusOn(f.focus.map(id => territoryPoint(map, id, true)));
       await beat((BEAT_MS * f.weight) / ui.speed);
     }
     ui.frame = null;
