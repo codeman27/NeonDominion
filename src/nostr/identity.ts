@@ -5,6 +5,7 @@ import { decode, nsecEncode } from 'nostr-tools/nip19';
 
 const GUEST_KEY = 'nd.nostr.guest.v1';
 const LOGIN_KEY = 'nd.nostr.login.v1';
+const NSEC_KEY = 'nd.nostr.nsec.v1';
 
 export interface NostrExtension {
   getPublicKey(): Promise<string>;
@@ -92,6 +93,27 @@ export function restoreGuest(storage: Pick<Storage, 'getItem' | 'setItem'>): Nos
   if (source !== null && source !== 'guest') return null;
   if (storage.getItem(GUEST_KEY) === null) return null;
   return connectGuest(storage);
+}
+
+export function forgetSavedNsec(storage: Pick<Storage, 'removeItem'>): void {
+  storage.removeItem(NSEC_KEY);
+}
+
+export function loginWithNsec(
+  input: string, remember: boolean, storage: Pick<Storage, 'setItem' | 'removeItem'>,
+): NostrIdentity {
+  const identity = connectNsec(input);
+  if (remember) storage.setItem(NSEC_KEY, input.trim());
+  else forgetSavedNsec(storage);
+  return identity;
+}
+
+/** Never prompt a signer or create a key during automatic restoration. */
+export function restoreLogin(storage: Pick<Storage, 'getItem' | 'setItem'>): NostrIdentity | null {
+  if (storage.getItem(LOGIN_KEY) !== 'nsec') return restoreGuest(storage);
+  const saved = storage.getItem(NSEC_KEY);
+  if (saved === null) return null;
+  return connectNsec(saved);
 }
 
 /** Imported keys are kept only in the signing closure, never in browser storage. */

@@ -10,7 +10,7 @@ export interface SocialConnection { ready: boolean; status: string }
 export interface SocialPublish { accepted: number; total: number; failures: string[] }
 export interface SocialWire {
   watch(filters: Filter[], receive: (event: Event) => void, change: (state: SocialConnection) => void): () => void;
-  query(filters: Filter[]): Promise<{ events: Event[]; status: string }>;
+  query(filters: Filter[], maxEvents?: number): Promise<{ events: Event[]; status: string }>;
   publish(event: Event): Promise<SocialPublish>;
   destroy(): void;
 }
@@ -79,7 +79,7 @@ export class SocialRelay implements SocialWire {
     return stop;
   }
 
-  query(filters: Filter[]): Promise<{ events: Event[]; status: string }> {
+  query(filters: Filter[], maxEvents = 10000): Promise<{ events: Event[]; status: string }> {
     if (this.destroyed) return Promise.reject(new Error('Friends connection is closed.'));
     return new Promise((resolve, reject) => {
       const events = new Map<string, Event>();
@@ -96,8 +96,8 @@ export class SocialRelay implements SocialWire {
       const cancel = () => finish(new Error('Friends connection is closed.'));
       const timeout = setTimeout(() => finish(new Error(`Could not load friends data. Check your connection and refresh. ${lastStatus}`)), 17000);
       const stop = this.watch(filters, event => {
-        if (events.size >= 10000 && !events.has(event.id)) {
-          finish(new Error('Too many friends events. Narrow your search.'));
+        if (events.size >= maxEvents && !events.has(event.id)) {
+          finish(new Error('Relay history exceeds the supported event limit. Keep your local data and reconnect using the original game.'));
           return;
         }
         events.set(event.id, event);

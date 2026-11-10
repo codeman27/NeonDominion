@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent, type EventTemplate } from 'nostr-tools/pure';
-import { connectExtension, connectGuest, connectNsec, forgetGuest, rememberLogin, restoreGuest } from './identity';
+import { connectExtension, connectGuest, connectNsec, forgetGuest, forgetSavedNsec, loginWithNsec, rememberLogin, restoreGuest, restoreLogin } from './identity';
 import { nsecEncode, npubEncode } from 'nostr-tools/nip19';
 
 const template: EventTemplate = { kind: 1, created_at: 1700000000, tags: [['t', 'neon-dominion-test']], content: 'signing test' };
@@ -15,6 +15,52 @@ function memoryStorage() {
 }
 
 describe('Nostr identity', () => {
+  it('remembers an imported login only with explicit opt-in and restores the same identity after refresh', async () => {
+    const storage = memoryStorage();
+    const nsec = nsecEncode(generateSecretKey());
+    const identity = loginWithNsec(` ${nsec} `, true, storage);
+    rememberLogin('nsec', storage);
+    const restored = restoreLogin(storage)!;
+    expect(restored.pubkey).toBe(identity.pubkey);
+    expect(restored.source).toBe('nsec');
+    expect(verifyEvent(await restored.signEvent(template))).toBe(true);
+    expect(storage.getItem('nd.nostr.nsec.v1')).toBe(nsec);
+    expect(JSON.stringify(restored)).not.toContain(nsec);
+    forgetSavedNsec(storage);
+    rememberLogin(null, storage);
+    expect(restoreLogin(storage)).toBeNull();
+    expect(storage.getItem('nd.nostr.nsec.v1')).toBeNull();
+  });
+  it('leaves non-remembered imported logins memory-only and removes a previously remembered key', () => {
+    const storage = memoryStorage();
+    const nsec = nsecEncode(generateSecretKey());
+    loginWithNsec(nsec, true, storage);
+    loginWithNsec(nsec, false, storage);
+    rememberLogin('nsec', storage);
+    expect(restoreLogin(storage)).toBeNull();
+    expect(storage.getItem('nd.nostr.nsec.v1')).toBeNull();
+  });
+  it('does not replace a saved guest or fall back to it when importing an account', () => {
+    const storage = memoryStorage(), guest = connectGuest(storage);
+    const imported = loginWithNsec(nsecEncode(generateSecretKey()), true, storage);
+    rememberLogin('nsec', storage);
+    expect(restoreLogin(storage)?.pubkey).toBe(imported.pubkey);
+    forgetSavedNsec(storage);
+    expect(restoreLogin(storage)).toBeNull();
+    rememberLogin('guest', storage);
+    expect(restoreLogin(storage)?.pubkey).toBe(guest.pubkey);
+  });
+  it('surfaces invalid saved imports and blocked storage without exposing the private key', () => {
+    const storage = memoryStorage();
+    rememberLogin('nsec', storage);
+    storage.setItem('nd.nostr.nsec.v1', 'nsec1sensitive-invalid-input');
+    expect(() => restoreLogin(storage)).toThrow('Invalid NSEC.');
+    expect(() => restoreLogin(storage)).not.toThrow('sensitive-invalid-input');
+    expect(storage.getItem('nd.nostr.nsec.v1')).toBe('nsec1sensitive-invalid-input');
+    expect(() => loginWithNsec(nsecEncode(generateSecretKey()), true, {
+      setItem: () => { throw new Error('Storage blocked'); }, removeItem: storage.removeItem,
+    })).toThrow('Storage blocked');
+  });
   it('exports device-account backups that restore the exact signing identity without serializing secrets', async () => {
     const storage = memoryStorage();
     const guest = connectGuest(storage);

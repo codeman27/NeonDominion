@@ -83,16 +83,22 @@ export function lobbyTemplate(payload: LobbyPayload, gameId?: string): EventTemp
   };
 }
 
-export function parseGameInvitation(event: Event, recipient: string): { invite: LobbyInvite; creation: CreateLobby } {
+export function parseLobbyCreation(event: Event): { invite: LobbyInvite; creation: CreateLobby } {
   const value: unknown = JSON.parse(event.content);
   if (!object(value) || !Array.isArray(value.relays)
     || !value.relays.every((r): r is string => typeof r === 'string')) throw new Error('Invalid game invitation.');
   const invite: LobbyInvite = { v: 1, id: event.id, host: event.pubkey, relays: normalizeRelays(value.relays) };
   const record = parseLobbyEvent(event, invite);
-  if (record.payload.type !== 'create' || !record.payload.invited?.some(f => f.pubkey === recipient)) {
+  if (record.payload.type !== 'create') throw new Error('Invalid lobby creation.');
+  return { invite, creation: record.payload };
+}
+
+export function parseGameInvitation(event: Event, recipient: string): { invite: LobbyInvite; creation: CreateLobby } {
+  const { invite, creation } = parseLobbyCreation(event);
+  if (!creation.invited?.some(f => f.pubkey === recipient)) {
     throw new Error('This game invitation is not addressed to your account.');
   }
-  return { invite, creation: record.payload };
+  return { invite, creation };
 }
 
 /** Reconstruct the event so a library verification-cache symbol cannot bypass validation. */
