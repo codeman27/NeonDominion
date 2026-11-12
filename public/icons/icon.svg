@@ -1,11 +1,61 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="sunGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffe45c"/>
-      <stop offset="35%" stop-color="#ff9d2b"/>
-      <stop offset="75%" stop-color="#ff2bd6"/>
-      <stop offset="100%" stop-color="#8a2be2"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#05010c"/>
+      <stop offset=".55" stop-color="#1a0538"/>
+      <stop offset="1" stop-color="#4a0b5e"/>
     </linearGradient>
+    <linearGradient id="sunGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe45c"/>
+      <stop offset=".35" stop-color="#ff9d2b"/>
+      <stop offset=".75" stop-color="#ff2bd6"/>
+      <stop offset="1" stop-color="#8a2be2"/>
+    </linearGradient>
+    <linearGradient id="floorFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".1"/>
+    </linearGradient>
+    <mask id="bands" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <rect y="238" width="512" height="11" fill="#000"/>
+      <rect y="272" width="512" height="14" fill="#000"/>
+      <rect y="307" width="512" height="17" fill="#000"/>
+    </mask>
+    <mask id="floorMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect y="350" width="512" height="162" fill="url(#floorFade)"/>
+    </mask>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="lineGlow" x="-10%" y="-400%" width="120%" height="900%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <clipPath id="sky-clip"><rect width="512" height="350"/></clipPath>
   </defs>
-  <circle cx="50" cy="50" r="40" fill="url(#sunGrad)"/>
+
+  <rect width="512" height="512" fill="#07010f"/>
+  <rect width="512" height="350" fill="url(#sky)"/>
+
+  <g fill="#fff">
+    <circle cx="62" cy="78" r="2.4" opacity=".75"/>
+    <circle cx="150" cy="44" r="1.6" opacity=".6"/>
+    <circle cx="420" cy="62" r="2.8" opacity=".85"/>
+    <circle cx="468" cy="150" r="1.8" opacity=".6"/>
+    <circle cx="40" cy="190" r="1.6" opacity=".5"/>
+    <circle cx="350" cy="30" r="1.6" opacity=".55"/>
+    <circle cx="95" cy="262" r="1.4" opacity=".4"/>
+  </g>
+
+  <g clip-path="url(#sky-clip)">
+    <circle cx="256" cy="230" r="150" fill="#ff2bd6" opacity=".55" filter="url(#glow)"/>
+    <circle cx="256" cy="230" r="150" fill="url(#sunGrad)" mask="url(#bands)"/>
+  </g>
+
+  <g mask="url(#floorMask)" stroke="#ff2bd6" stroke-width="3" fill="none">
+    <path d="M0 372H512M0 396H512M0 426H512M0 464H512M0 508H512"/>
+    <path d="M256 350V512M256 350L176 512M256 350L336 512M256 350L96 512M256 350L416 512M256 350L16 512M256 350L496 512M256 350L-64 512M256 350L576 512M256 350L-144 512M256 350L656 512"/>
+  </g>
+
+  <rect y="345" width="512" height="10" fill="#19f6ff" opacity=".7" filter="url(#lineGlow)"/>
+  <rect y="348" width="512" height="4" fill="#19f6ff"/>
 </svg>
